@@ -27,6 +27,17 @@ def log_signal(signal: dict, horizon: str = "SWING",
             for name, eng in engines.items()
         }
         with SessionLocal() as sess:
+            # One idea per (symbol, direction, horizon, UTC day): the scanner
+            # re-emits the same signal several times a day, inflating the journal.
+            day_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            dup = (sess.query(SignalJournalEntry.id)
+                   .filter(SignalJournalEntry.symbol == signal.get("symbol", "?"),
+                           SignalJournalEntry.direction == signal.get("trend"),
+                           SignalJournalEntry.horizon == horizon,
+                           SignalJournalEntry.emitted_at >= day_start)
+                   .first())
+            if dup:
+                return dup[0]
             row = SignalJournalEntry(
                 emitted_at=datetime.utcnow(),
                 symbol=signal.get("symbol", "?"),
