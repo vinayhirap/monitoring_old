@@ -181,7 +181,11 @@ def run(
                 conf, sig = _local_score(window)
             except Exception:
                 continue
-            if conf >= confidence_threshold and sig in ("BUY", "SELL"):
+            # A SELL needs a LOW combined score (<=40), so comparing the raw score
+            # to the threshold made every SELL impossible (backtest was long-only).
+            # Use signal strength: score for BUY, 100 - score for SELL.
+            strength = conf if sig == "BUY" else (100.0 - conf if sig == "SELL" else 0.0)
+            if strength >= confidence_threshold and sig in ("BUY", "SELL"):
                 tech_res = technical.analyze(window)
                 atr_val = tech_res.indicators["atr14"]
                 if atr_val <= 0:
@@ -198,7 +202,7 @@ def run(
                 current_trade = {
                     "entry_i": i, "entry_date": date, "entry": entry,
                     "stop": stop, "target": target, "direction": direction,
-                    "confidence": round(conf, 2),
+                    "confidence": round(strength, 2),
                 }
                 in_position = True
 
