@@ -1,0 +1,91 @@
+# Web framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.12
+
+# Settings & validation
+pydantic==2.9.2
+pydantic-settings==2.5.2
+python-dotenv==1.0.1
+# Email validation — needed for EmailStr in auth signup schema
+email-validator==2.2.0
+
+# Database
+sqlalchemy==2.0.35
+aiosqlite==0.20.0
+# PostgreSQL — install when DATABASE_URL points to postgres://. SQLite still works without.
+psycopg2-binary==2.9.9
+asyncpg==0.29.0
+alembic==1.13.3
+# Redis — optional; system gracefully falls back to in-memory if unavailable.
+redis==5.0.8
+# Celery — optional background job queue. System runs synchronously without it.
+celery[redis]==5.4.0
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+# bcrypt 4.x removed __about__.__version__ which passlib 1.7.4 still reads.
+# Pin to 3.x until passlib releases a compatible 1.7.5+. See:
+# https://github.com/pyca/bcrypt/issues/684
+bcrypt==3.2.2
+pyotp==2.9.0
+
+# Numerics
+numpy==1.26.4
+pandas==2.2.3
+scipy==1.14.1
+
+# Astronomy / astrology — Swiss Ephemeris
+pyswisseph==2.10.3.2
+
+# Date / timezone
+python-dateutil==2.9.0.post0
+pytz==2024.2
+
+# HTTP / broker
+httpx==0.27.2
+requests==2.32.3
+websocket-client==1.8.0
+
+# Angel One SmartAPI
+# logzero is a smartapi-python peer dep they forgot to declare in setup.py —
+# without it the import fails with "No module named 'logzero'".
+smartapi-python==1.5.5
+logzero==1.7.0
+
+# Machine Learning — calibrated probability scoring (Tier-1 of ROADMAP.md)
+scikit-learn==1.5.2
+joblib==1.4.2
+lightgbm==4.5.0
+shap==0.46.0
+# Portfolio optimisation (CVXPY — disciplined convex programming)
+cvxpy==1.5.3
+
+# Utils
+loguru==0.7.2
+orjson==3.10.7
+
+# Background scheduling — for the picks scanner that pre-computes
+# /api/portal/top-picks every N minutes (see app/jobs/picks_scanner.py).
+# Without this, the API falls back to running the scan inline per request.
+apscheduler==3.10.4
+
+# Redis client — only used when REDIS_URL env is set. The login rate
+# limiter (auth_service.py) and the scanner cache will both swap to
+# Redis-backed storage automatically when this is available, enabling
+# multi-process / multi-replica deployments. With REDIS_URL unset, the
+# code path is identical and these dependencies are unused.
+redis==5.0.8
+
+# Twitter / X client — only used when TWITTER_API_KEY and friends are
+# set (see app/services/twitter_bot.py). With creds unset, this dep is
+# unused. Tweepy is a fully-typed wrapper around the X API v2 with proper
+# OAuth1 + OAuth2 support.
+tweepy==4.14.0
+
+# Optional: local LLM via llama-cpp-python. Heavy package (compiles a C
+# inference engine). Comment out if you don't want LLM-fluent explanations
+# — the template-based explainer in signal_explainer.py works without it.
+# Uncomment + set LOCAL_LLM_MODEL_PATH env to enable:
+# llama-cpp-python==0.3.2
