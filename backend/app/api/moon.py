@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/reading", summary="Complete lunar reading with trading gate (PROCEED/CAUTION/WAIT/AVOID)")
-async def reading(asof: datetime | None = Query(None)):
+def reading(asof: datetime | None = Query(None)):
     try:
         return moon.reading(asof).to_dict()
     except Exception as e:

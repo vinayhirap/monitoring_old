@@ -51,3 +51,11 @@ session_tokens/
 1
 *.zip
 .claude/
+
+.env
+.env.*
+!.env.example
+*.bak
+*.bak-*
+audit_report.json
+*.patch

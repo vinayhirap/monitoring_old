@@ -14,12 +14,12 @@ router = APIRouter()
 
 
 @router.get("/status", summary="ML model status — trained? when? performance?")
-async def status():
+def status():
     return ml.status()
 
 
 @router.get("/predict/{symbol}", summary="Run the trained ML ensemble on a single symbol")
-async def predict(symbol: str):
+def predict(symbol: str):
     if not ml.is_trained():
         raise HTTPException(409, "ML models not trained yet — POST /api/ml/train first")
     sym = symbol.upper()
@@ -76,7 +76,7 @@ class TrainRequest(BaseModel):
 
 
 @router.post("/train", summary="Train (or retrain) the ML ensemble — slow (~2-5 min)")
-async def train(req: TrainRequest, background: BackgroundTasks):
+def train(req: TrainRequest, background: BackgroundTasks):
     """Kicks off training. This trains on historical OHLCV bars from the
     backfill table — needs at least ~3 months of bars per symbol.
 
@@ -115,7 +115,7 @@ async def train(req: TrainRequest, background: BackgroundTasks):
 
 
 @router.get("/feature-importance", summary="Top GBM feature importances")
-async def feature_importance():
+def feature_importance():
     s = ml.status()
     if not s["trained"]:
         raise HTTPException(409, "not trained")
@@ -135,7 +135,7 @@ async def feature_importance():
 
 
 @router.get("/calibration-curve", summary="Predicted-prob vs realized-rate (OOS)")
-async def calibration_curve():
+def calibration_curve():
     s = ml.status()
     if not s["trained"]:
         raise HTTPException(409, "not trained")

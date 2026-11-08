@@ -253,7 +253,7 @@ def get_option_chain(symbol: str, expiry, only_around_atm: int = 11) -> list[dic
           ce_delta, pe_delta, ce_gamma, pe_gamma,
           ce_theta, pe_theta, ce_vega, pe_vega}, ...]
 
-    expiry: date object or "DDMMMYY" string.
+    expiry: date object or "DDMMMYYYY" string (e.g. "10JUL2025").
     only_around_atm: keep this many strikes around the ATM (centred) to keep
     the payload reasonable.
 
@@ -265,10 +265,10 @@ def get_option_chain(symbol: str, expiry, only_around_atm: int = 11) -> list[dic
             raise LiveDataUnavailable("Broker not authenticated for option chain")
         return []
 
-    # Normalize expiry to Angel One's "DDMMMYY" format
+    # Angel One optionGreek requires a 4-digit year: "DDMMMYYYY"
     from datetime import date as _date
     if isinstance(expiry, _date):
-        expiry_str = expiry.strftime("%d%b%y").upper()
+        expiry_str = expiry.strftime("%d%b%Y").upper()
     else:
         expiry_str = str(expiry).upper()
 

@@ -730,6 +730,9 @@ def _safe_stop_loss(*, entry: float, direction: str, atr: float,
     """Run the multi-method SL engine. Always returns a dict (errors come
     back as {error, recommended_method: 'ATR_FALLBACK'}) so the API contract
     stays predictable."""
+    if direction not in ("BULLISH", "BEARISH"):
+        return {"error": f"No directional bias ({direction}) - stop-loss not computed",
+                "recommended_method": "NONE"}
     try:
         # Volatility regime from quant analysis influences ATR multiplier
         regime = (quant or {}).get("regime", "NORMAL") if quant else "NORMAL"
@@ -826,14 +829,15 @@ def _safe_options_analysis(sym: str, spot: float, direction: str,
     """Pull live or synthetic chain, compute analytics + trade plan."""
     from datetime import date as _date, timedelta as _td
     try:
+        # Expiry comes from the scrip master (NSE changes expiry weekdays).
+        # Fallback if the master has nothing: nearest Tuesday (current NSE index expiry day).
+        today = _date.today()
+        expiry = instruments.nearest_expiry(sym) or (
+            today + _td(days=(1 - today.weekday()) % 7))
         # Try live chain first
         chain: list[dict] = []
         try:
             if broker_instance.is_authenticated():
-                # Most NSE F&O have weekly expiry on Thursday; pick nearest Thursday
-                today = _date.today()
-                days_to_thu = (3 - today.weekday()) % 7 or 7
-                expiry = today + _td(days=days_to_thu)
                 # Real chain fetch — wrapped: not all symbols have it
                 from app.services.market_data import get_option_chain
                 chain = get_option_chain(sym, expiry) or []
@@ -853,11 +857,6 @@ def _safe_options_analysis(sym: str, spot: float, direction: str,
             chain_source = "synthetic"
         else:
             chain_source = "live"
-
-        # Nearest Thursday for expiry default
-        today = _date.today()
-        days_to_thu = (3 - today.weekday()) % 7 or 7
-        expiry = today + _td(days=days_to_thu)
 
         # Aggregate analytics (PCR, max pain, walls)
         analytics = options_eng.analyze(sym, spot, expiry, chain).to_dict()

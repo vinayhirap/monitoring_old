@@ -184,7 +184,6 @@ const TRANSLATIONS = {
 // from `hi`, this assertion fails at compile time.
 type EnKeys = keyof (typeof TRANSLATIONS)["en"];
 type HiKeys = keyof (typeof TRANSLATIONS)["hi"];
-// @ts-expect-error — purposeful assertion: this errors only when keys diverge
 const _typeCheck: EnKeys extends HiKeys ? (HiKeys extends EnKeys ? true : false) : false = true;
 void _typeCheck;
 

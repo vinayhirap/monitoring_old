@@ -6,7 +6,7 @@ import { fetcher } from "@/lib/api";
 import { Panel, Stat } from "@/components/Panel";
 import { ErrorState, EmptyState, InfoBanner, LoadingSkeleton } from "@/components/States";
 import {
-  Sparkles, Flask, TrendingUp, TrendingDown, Calendar, Target, RefreshCw, AlertTriangle,
+  Sparkles, TrendingUp, TrendingDown, Calendar, Target, RefreshCw, AlertTriangle,
   CheckCircle2, XCircle, ArrowRight,
 } from "lucide-react";
 import clsx from "clsx";

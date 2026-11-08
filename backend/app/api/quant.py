@@ -11,7 +11,7 @@ router = APIRouter()
     "/{symbol}",
     summary="Advanced-math indicators — Hurst, Kalman, GARCH, OU half-life, LR channel, etc.",
 )
-async def quant_analysis(
+def quant_analysis(
     symbol: str,
     exchange: str = "NSE",
     periods: int = Query(250, ge=50, le=2000),
@@ -32,7 +32,7 @@ async def quant_analysis(
     "/{symbol}/pivots",
     summary="Camarilla + Standard + Fibonacci pivot levels (daily / weekly / monthly)",
 )
-async def pivot_levels(
+def pivot_levels(
     symbol: str,
     exchange: str = "NSE",
     period: str = Query("daily", pattern="^(daily|weekly|monthly)$"),

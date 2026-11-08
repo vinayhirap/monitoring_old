@@ -18,7 +18,7 @@ DEFAULT_WATCHLIST = [
 
 
 @router.get("/live", summary="Run decision engine on a watchlist (paper mode safe)")
-async def live_signals(
+def live_signals(
     symbols: str | None = Query(None, description="Comma-separated symbols; default = top 12"),
     horizon: str = "SWING",
     capital: float = 100_000,
@@ -60,7 +60,7 @@ async def live_signals(
 
 
 @router.get("/recent", summary="Recently persisted signals")
-async def recent_signals(limit: int = 20, db: Session = Depends(get_db)):
+def recent_signals(limit: int = 20, db: Session = Depends(get_db)):
     rows = db.query(Signal).order_by(Signal.created_at.desc()).limit(limit).all()
     return [
         {

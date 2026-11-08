@@ -11,7 +11,7 @@ router = APIRouter()
     "/run/{symbol}",
     summary="Run pipeline-driven backtest with Sharpe/Sortino/Calmar/max-DD",
 )
-async def run(symbol: str,
+def run(symbol: str,
               periods: int = Query(500, ge=100, le=2000),
               min_confidence: float = Query(60, ge=0, le=100),
               risk_per_trade_pct: float = Query(1.0, gt=0, le=10),

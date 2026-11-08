@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/mtf/{symbol}", summary="Multi-timeframe (Daily / Weekly / Monthly) agreement")
-async def multi_timeframe(symbol: str, periods: int = Query(500, ge=200, le=2000)):
+def multi_timeframe(symbol: str, periods: int = Query(500, ge=200, le=2000)):
     try:
         df = get_ohlcv(symbol.upper(), periods=periods)
         return {"symbol": symbol.upper(), **mtf.analyze(df)}
@@ -20,7 +20,7 @@ async def multi_timeframe(symbol: str, periods: int = Query(500, ge=200, le=2000
 
 
 @router.get("/sectors/heatmap", summary="Sector rotation heatmap — bullish vs bearish stock counts per sector")
-async def sector_heatmap(parallel: int = Query(6, ge=1, le=16)):
+def sector_heatmap(parallel: int = Query(6, ge=1, le=16)):
     """For every sector, runs decision.aggregate on each constituent and
     aggregates how many came back bullish vs bearish. Surface as a heatmap
     to spot rotation (e.g. money rotating out of IT into Banking).

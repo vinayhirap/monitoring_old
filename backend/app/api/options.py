@@ -63,7 +63,7 @@ def recommend_fno(
 
 
 @router.post("/analyze", summary="Analyze an options chain (PCR, Max Pain, Greeks)")
-async def analyze_chain(req: OptionsAnalyzeRequest,
+def analyze_chain(req: OptionsAnalyzeRequest,
                          user: Annotated[User, Depends(require_tier("INTERMEDIATE"))]):
     try:
         result = options.analyze(req.symbol, req.spot_price, req.expiry, req.chain)
@@ -73,7 +73,7 @@ async def analyze_chain(req: OptionsAnalyzeRequest,
 
 
 @router.get("/synthetic/{symbol}", summary="Generate a synthetic options chain (paper mode demo)")
-async def synthetic_chain(symbol: str,
+def synthetic_chain(symbol: str,
                            user: Annotated[User, Depends(require_tier("INTERMEDIATE"))],
                            spot: float = Query(..., gt=0),
                            step: float = 50,
@@ -87,7 +87,7 @@ async def synthetic_chain(symbol: str,
 
 
 @router.get("/greeks", summary="Black-Scholes Greeks for a single option")
-async def greeks(user: Annotated[User, Depends(require_tier("INTERMEDIATE"))],
+def greeks(user: Annotated[User, Depends(require_tier("INTERMEDIATE"))],
                   spot: float = Query(..., gt=0),
                   strike: float = Query(..., gt=0),
                   days: int = Query(..., ge=0),

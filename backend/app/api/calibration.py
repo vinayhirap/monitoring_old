@@ -16,7 +16,7 @@ router = APIRouter()
     "/{symbol}",
     summary="Walk-forward calibration self-check (is the engine honestly calibrated?)",
 )
-async def calibrate_symbol(
+def calibrate_symbol(
     symbol: str,
     exchange: str = "NSE",
     lookback_bars: int = Query(150, ge=50, le=500,
@@ -67,7 +67,7 @@ async def calibrate_symbol(
     "/quick/{symbol}",
     summary="Light calibration (fewer bars, faster ~10s)",
 )
-async def quick_calibrate(symbol: str, exchange: str = "NSE"):
+def quick_calibrate(symbol: str, exchange: str = "NSE"):
     try:
         df = get_ohlcv(symbol.upper(), exchange=exchange, periods=120)
         if df is None or df.empty:

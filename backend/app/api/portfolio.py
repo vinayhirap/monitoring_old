@@ -35,7 +35,7 @@ class MVRequest(BaseModel):
 
 
 @router.post("/mean-variance", summary="Markowitz mean-variance optimal weights")
-async def mean_variance(req: MVRequest):
+def mean_variance(req: MVRequest):
     try:
         syms, returns = _gather_returns(req.symbols, req.lookback_periods)
         if returns.size == 0:
@@ -59,7 +59,7 @@ class RPRequest(BaseModel):
 
 
 @router.post("/risk-parity", summary="Equal-risk-contribution portfolio")
-async def risk_parity(req: RPRequest):
+def risk_parity(req: RPRequest):
     try:
         syms, returns = _gather_returns(req.symbols, req.lookback_periods)
         if returns.size == 0:
@@ -82,7 +82,7 @@ class BLRequest(BaseModel):
 
 
 @router.post("/black-litterman", summary="Bayesian blend of equilibrium + analyst views")
-async def black_litterman(req: BLRequest):
+def black_litterman(req: BLRequest):
     try:
         syms, returns = _gather_returns(req.symbols, req.lookback_periods)
         if returns.size == 0:

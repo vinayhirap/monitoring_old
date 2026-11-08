@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.get("/run", summary="Run the full gated pipeline (esoteric → technical → strategy → consistency → accuracy)")
-async def run(
+def run(
     horizon: Literal["INTRADAY", "SWING", "POSITIONAL"] = "SWING",
     capital: float = 100_000,
     esoteric_min: float = Query(55.0, ge=50, le=100),
@@ -50,7 +50,7 @@ async def run(
 
 
 @router.get("/esoteric/{symbol}", summary="Stage 1 only — esoteric reading for a single symbol")
-async def esoteric_single(symbol: str):
+def esoteric_single(symbol: str):
     try:
         r = pipeline.esoteric_evaluate(symbol.upper())
         return {
@@ -63,7 +63,7 @@ async def esoteric_single(symbol: str):
 
 
 @router.get("/fibonacci/{symbol}", summary="Auto-detected Fibonacci levels for a symbol")
-async def fib_single(symbol: str, lookback: int = 60):
+def fib_single(symbol: str, lookback: int = 60):
     try:
         df = get_ohlcv(symbol.upper(), periods=lookback + 30)
         return fibonacci.analyze(df, lookback=lookback).to_dict()
@@ -72,7 +72,7 @@ async def fib_single(symbol: str, lookback: int = 60):
 
 
 @router.get("/symbol-astro/{symbol}", summary="Per-symbol astrology match (nakshatra alignment)")
-async def symbol_astro(symbol: str):
+def symbol_astro(symbol: str):
     try:
         return astrology.symbol_astro_match(symbol.upper())
     except Exception as e:

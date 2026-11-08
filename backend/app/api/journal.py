@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.get("/engine-attribution",
              summary="Per-engine hit rate from evaluated journal signals — which engines actually contribute alpha")
-async def engine_attribution_endpoint(
+def engine_attribution_endpoint(
     db: Annotated[Session, Depends(get_db)],
     days: int = Query(90, ge=7, le=365,
                         description="Lookback window (default 90 days)"),
@@ -66,7 +66,7 @@ async def engine_attribution_endpoint(
 
 @router.post("/engine-attribution/refresh-weights",
               summary="Force-refresh the engine-weights cache (admin/dev)")
-async def refresh_weights():
+def refresh_weights():
     """Bypass the 1-hour TTL and recompute weights from the latest journal
     state. Useful right after the outcome tracker finishes a run."""
     from app.services import engine_weights
@@ -76,7 +76,7 @@ async def refresh_weights():
 
 @router.get("/history",
              summary="Recent recommendation history (last N days)")
-async def history(
+def history(
     days: int = Query(14, ge=1, le=90, description="Lookback window in days"),
     symbol: str | None = None,
     direction: str | None = Query(None, description="BULLISH / BEARISH"),
@@ -100,12 +100,12 @@ async def history(
 
 
 @router.post("/purge", summary="Purge journal rows older than N days (default 14)")
-async def purge(days: int = Query(14, ge=1, le=365)):
+def purge(days: int = Query(14, ge=1, le=365)):
     return signals_logger.purge_older_than_days(days=days)
 
 
 @router.get("/recent", summary="Recent journaled signals (with outcomes if evaluated)")
-async def recent(limit: int = Query(50, ge=1, le=500),
+def recent(limit: int = Query(50, ge=1, le=500),
                   symbol: str | None = None,
                   status: str | None = Query(None, description="PENDING/EVALUATED/STALE")):
     with SessionLocal() as sess:
@@ -136,7 +136,7 @@ async def recent(limit: int = Query(50, ge=1, le=500),
 
 
 @router.get("/stats", summary="Aggregate track-record statistics")
-async def stats(since_days: int = Query(90, ge=1, le=730),
+def stats(since_days: int = Query(90, ge=1, le=730),
                  horizon: str | None = None):
     try:
         return outcome_tracker.journal_stats(since_days=since_days, horizon=horizon)
@@ -145,7 +145,7 @@ async def stats(since_days: int = Query(90, ge=1, le=730),
 
 
 @router.post("/evaluate-due", summary="Run outcome tracker for all due (matured) signals")
-async def evaluate_due(max_per_run: int = Query(200, ge=1, le=1000)):
+def evaluate_due(max_per_run: int = Query(200, ge=1, le=1000)):
     try:
         return outcome_tracker.mark_due_outcomes(max_per_run=max_per_run)
     except Exception as e:
@@ -153,7 +153,7 @@ async def evaluate_due(max_per_run: int = Query(200, ge=1, le=1000)):
 
 
 @router.post("/evaluate/{signal_id}", summary="Force-evaluate a single signal id")
-async def evaluate_one(signal_id: int):
+def evaluate_one(signal_id: int):
     ok = outcome_tracker.mark_signal(signal_id)
     if not ok:
         raise HTTPException(404, f"signal {signal_id} not found or data missing")

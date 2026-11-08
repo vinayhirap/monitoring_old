@@ -20,18 +20,18 @@ INDEX_LOOKUP = {
 
 
 @router.get("/instruments/status", summary="Angel One scrip-master cache status")
-async def instruments_status():
+def instruments_status():
     return instruments.stats()
 
 
 @router.post("/instruments/refresh", summary="Force-refresh the Angel One scrip-master cache")
-async def instruments_refresh():
+def instruments_refresh():
     n = instruments.load(force_refresh=True)
     return {"reloaded": True, "indexed": n}
 
 
 @router.get("/search", summary="Symbol search — autocomplete-friendly")
-async def search_instruments(q: str, exchange: str = "", limit: int = 20):
+def search_instruments(q: str, exchange: str = "", limit: int = 20):
     """Fuzzy-prefix search over the scrip master. Returns top `limit`
     matches ordered by:
       1. Exact symbol match first
@@ -111,7 +111,7 @@ async def search_instruments(q: str, exchange: str = "", limit: int = 20):
 
 @router.get("/sanity-audit",
              summary="Bulk scan a list of symbols and report which ones have SUSPECT pricing")
-async def sanity_audit(symbols: str = "NIFTY,BANKNIFTY,RELIANCE,TCS,HDFCBANK,INFY,ICICIBANK,SBIN,COALINDIA,ITC",
+def sanity_audit(symbols: str = "NIFTY,BANKNIFTY,RELIANCE,TCS,HDFCBANK,INFY,ICICIBANK,SBIN,COALINDIA,ITC",
                          exchange: str = "NSE"):
     """Scans the symbol list, runs the 3-way price sanity check on each,
     returns the SUSPECT ones first. Use this proactively (cron, manual
@@ -185,7 +185,7 @@ async def sanity_audit(symbols: str = "NIFTY,BANKNIFTY,RELIANCE,TCS,HDFCBANK,INF
              summary="Per-symbol data-integrity diagnostic — walks each step from "
                      "scrip-master lookup → OHLCV fetch → LTP cross-check and reports "
                      "exactly where (if anywhere) the data goes wrong.")
-async def diagnose_symbol(symbol: str, exchange: str = "NSE", periods: int = 50):
+def diagnose_symbol(symbol: str, exchange: str = "NSE", periods: int = 50):
     """Use this when a symbol's price looks wrong on the UI. The output
     tells you exactly which layer is broken:
 
@@ -277,7 +277,7 @@ async def diagnose_symbol(symbol: str, exchange: str = "NSE", periods: int = 50)
 
 
 @router.get("/ohlcv/{symbol}", summary="OHLCV history (paper-safe)")
-async def ohlcv(symbol: str, exchange: str = "NSE", periods: int = 250):
+def ohlcv(symbol: str, exchange: str = "NSE", periods: int = 250):
     try:
         df = get_ohlcv(symbol, exchange=exchange, periods=periods)
         df = df.reset_index().rename(columns={df.index.name or "index": "timestamp"})
@@ -319,7 +319,7 @@ def _paper_quote(sym: str, exchange: str, display: str) -> dict:
 
 
 @router.get("/indices", summary="Live prices for headline indices (NIFTY / BANKNIFTY / FINNIFTY / SENSEX)")
-async def indices():
+def indices():
     """Returns headline-index quotes for the global header ticker.
 
     LIVE  : single batch call via SmartAPI getMarketData(LTP) — efficient.
@@ -406,7 +406,7 @@ async def indices():
 
 
 @router.get("/quote/{symbol}", summary="LTP for a single instrument")
-async def quote(symbol: str, exchange: str = "NSE"):
+def quote(symbol: str, exchange: str = "NSE"):
     """One-shot LTP call for any symbol — falls back to last-close in paper mode."""
     if not broker_instance.is_authenticated():
         df = get_ohlcv(symbol, exchange=exchange, periods=2)

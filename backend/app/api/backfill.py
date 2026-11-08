@@ -16,7 +16,7 @@ router = APIRouter()
     "/run",
     summary="Start OHLCV backfill in background — pulls historical bars from Angel One",
 )
-async def start_backfill(
+def start_backfill(
     interval: Literal["5m", "15m", "1h", "1d"] = Query("1d"),
     days_back: int = Query(730, ge=30, le=3650,
                             description="How many calendar days back to fetch"),
@@ -46,7 +46,7 @@ async def start_backfill(
     "/run-sync",
     summary="Blocking backfill — for small symbol lists only",
 )
-async def run_sync(
+def run_sync(
     symbols: str = Query(..., description="Comma-separated symbols"),
     interval: Literal["5m", "15m", "1h", "1d"] = "1d",
     days_back: int = Query(365, ge=30, le=3650),
@@ -63,5 +63,5 @@ async def run_sync(
 
 
 @router.get("/status", summary="Backfill progress")
-async def status():
+def status():
     return backfill.get_status()

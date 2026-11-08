@@ -14,7 +14,7 @@ router = APIRouter()
 
 
 @router.get("/snapshot", summary="Live risk snapshot — exposure, P&L, headroom, limits")
-async def snapshot(capital: float = Query(100_000, gt=0), db: Session = Depends(get_db)):
+def snapshot(capital: float = Query(100_000, gt=0), db: Session = Depends(get_db)):
     """Aggregate portfolio risk in one call. Combines:
        • broker positions (live or paper) for current exposure
        • today's filled trades from local DB for realized P&L
@@ -87,8 +87,8 @@ async def snapshot(capital: float = Query(100_000, gt=0), db: Session = Depends(
 
 
 @router.get("/can-trade", summary="Should a new entry be allowed right now?")
-async def can_trade(capital: float = Query(100_000, gt=0), db: Session = Depends(get_db)):
-    snap = await snapshot(capital=capital, db=db)
+def can_trade(capital: float = Query(100_000, gt=0), db: Session = Depends(get_db)):
+    snap = snapshot(capital=capital, db=db)
     return {
         "allowed": not snap["daily_loss_breached"]
                     and snap["exposure_pct"] < snap["exposure_pct_limit"],

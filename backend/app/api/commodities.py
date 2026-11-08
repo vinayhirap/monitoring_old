@@ -35,7 +35,7 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 @router.get("/list", summary="List all MCX commodities with their ruling planets")
-async def list_commodities(
+def list_commodities(
     user: Annotated[User, Depends(require_tier("INTERMEDIATE"))],
 ):
     return {
@@ -56,7 +56,7 @@ async def list_commodities(
 # ---------------------------------------------------------------------------
 
 @router.get("/astro/{symbol}", summary="Commodity-specific astrology score (ruling-planet driven)")
-async def commodity_astro(symbol: str,
+def commodity_astro(symbol: str,
                            user: Annotated[User, Depends(require_tier("INTERMEDIATE"))]):
     try:
         return cu.commodity_astro_match(symbol.upper())
@@ -69,7 +69,7 @@ async def commodity_astro(symbol: str,
 # ---------------------------------------------------------------------------
 
 @router.get("/{symbol}", summary="Per-commodity full analysis (chart, engines, options, gap forecast)")
-async def commodity_detail(symbol: str,
+def commodity_detail(symbol: str,
                             user: Annotated[User, Depends(require_tier("INTERMEDIATE"))],
                             horizon: str = Query("SWING", pattern="^(INTRADAY|SWING|POSITIONAL)$"),
                             capital: float = Query(100_000, gt=0),
@@ -204,7 +204,7 @@ def _score_one(sym: str, horizon: str, capital: float) -> dict | None:
 
 
 @router.get("/scan", summary="Scan all MCX commodities and rank")
-async def scan(user: Annotated[User, Depends(require_tier("INTERMEDIATE"))],
+def scan(user: Annotated[User, Depends(require_tier("INTERMEDIATE"))],
                 horizon: str = Query("SWING", pattern="^(INTRADAY|SWING|POSITIONAL)$"),
                 capital: float = Query(100_000, gt=0),
                 min_confidence: float = Query(55.0, ge=0, le=100),

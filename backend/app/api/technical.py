@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.post("/score", summary="Technical indicator score (RSI/MACD/EMA/etc.)")
-async def technical_score(req: AnalysisRequest):
+def technical_score(req: AnalysisRequest):
     try:
         df = get_ohlcv(req.symbol, exchange=req.exchange, periods=250)
         return technical.analyze(df).to_dict()
@@ -18,7 +18,7 @@ async def technical_score(req: AnalysisRequest):
 
 
 @router.post("/smc", summary="Smart Money Concepts + ICT analysis")
-async def smc_analysis(req: AnalysisRequest):
+def smc_analysis(req: AnalysisRequest):
     try:
         df = get_ohlcv(req.symbol, exchange=req.exchange, periods=250)
         return smc.analyze(df).to_dict()
@@ -27,7 +27,7 @@ async def smc_analysis(req: AnalysisRequest):
 
 
 @router.get("/pivots/{symbol}", summary="Pivot points (standard, Camarilla, Fibonacci)")
-async def pivot_levels(symbol: str,
+def pivot_levels(symbol: str,
                        period: str = Query("daily", pattern="^(daily|weekly|monthly)$")):
     try:
         df = get_ohlcv(symbol.upper(), periods=250)
@@ -37,7 +37,7 @@ async def pivot_levels(symbol: str,
 
 
 @router.get("/ichimoku/{symbol}", summary="Ichimoku Cloud (Tenkan, Kijun, Senkou A/B, Chikou)")
-async def ichimoku_cloud(symbol: str):
+def ichimoku_cloud(symbol: str):
     try:
         df = get_ohlcv(symbol.upper(), periods=250)
         return ichimoku.analyze(df).to_dict()

@@ -23,7 +23,7 @@ class ExitRequest(BaseModel):
 
 
 @router.post("/evaluate", summary="Should I exit this position? (HOLD/TRAIL/PARTIAL/FULL)")
-async def evaluate_exit(req: ExitRequest):
+def evaluate_exit(req: ExitRequest):
     try:
         df = get_ohlcv(req.symbol, periods=250)
         decision = exit_engine.evaluate(

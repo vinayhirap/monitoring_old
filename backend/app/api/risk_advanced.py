@@ -19,7 +19,7 @@ class PositionRisk(BaseModel):
 
 
 @router.post("/position", summary="VaR / ES / Monte Carlo / Sharpe / Sortino for a single position")
-async def position_risk(req: PositionRisk):
+def position_risk(req: PositionRisk):
     try:
         df = get_ohlcv(req.symbol, periods=req.lookback_periods)
         if df is None or df.empty:
@@ -43,7 +43,7 @@ class PortfolioRiskRequest(BaseModel):
 
 
 @router.post("/portfolio", summary="Aggregate portfolio VaR with correlation matrix")
-async def portfolio_risk(req: PortfolioRiskRequest):
+def portfolio_risk(req: PortfolioRiskRequest):
     try:
         positions_with_returns = []
         for p in req.positions:
@@ -71,7 +71,7 @@ class StressTestRequest(BaseModel):
 
 
 @router.post("/stress-test", summary="Apply historical stress scenarios to current positions")
-async def stress_test(req: StressTestRequest):
+def stress_test(req: StressTestRequest):
     try:
         return risk_analytics.stress_test(req.positions, scenarios=req.scenarios)
     except Exception as e:
@@ -79,7 +79,7 @@ async def stress_test(req: StressTestRequest):
 
 
 @router.get("/scenarios", summary="List available historical stress scenarios")
-async def list_scenarios():
+def list_scenarios():
     return {
         "scenarios": [
             {"key": k, **v} for k, v in risk_analytics.STRESS_SCENARIOS.items()

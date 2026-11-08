@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/run/{symbol}", summary="Run walk-forward backtest on a single symbol")
-async def run_backtest(
+def run_backtest(
     symbol: str,
     lookback_bars: int = Query(180, ge=30, le=500),
     warmup_bars: int = Query(60, ge=20, le=200),
@@ -35,7 +35,7 @@ async def run_backtest(
 
 
 @router.get("/batch", summary="Backtest a list of symbols and return summary stats")
-async def batch_backtest(
+def batch_backtest(
     symbols: str = Query(..., description="Comma-separated"),
     lookback_bars: int = 180,
     confidence_threshold: float = 65.0,

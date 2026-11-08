@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 @router.get("/indices", summary="List supported NSE indices with their internal symbols")
-async def list_indices():
+def list_indices():
     return {
         "count": len(nse_importer.NSE_INDEX_MAP),
         "indices": [
@@ -34,7 +34,7 @@ async def list_indices():
     "/scrape/{nse_name:path}",
     summary="Scrape one index from nseindia.com (may fail from AWS IPs)",
 )
-async def scrape_one(
+def scrape_one(
     nse_name: str,
     days_back: int = Query(365, ge=30, le=3650),
 ):
@@ -62,7 +62,7 @@ async def scrape_one(
     "/scrape-all",
     summary="Scrape all supported NSE indices (fragile from AWS — prefer /import-csv per index)",
 )
-async def scrape_all(
+def scrape_all(
     days_back: int = Query(365, ge=30, le=3650),
     categories: str | None = Query(None, description="Comma-separated: broad,sectoral,smart-beta,volatility"),
 ):

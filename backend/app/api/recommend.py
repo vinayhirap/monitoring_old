@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.get("/scan", summary="Scan a universe of symbols and return ranked Top-N recommendations")
-async def scan(
+def scan(
     horizon: Literal["INTRADAY", "SWING", "POSITIONAL"] = "SWING",
     capital: float = 100_000,
     min_confidence: float = Query(60.0, ge=0, le=100),
@@ -66,7 +66,7 @@ async def scan(
         "horizon's min-hold period."
     ),
 )
-async def professional(
+def professional(
     horizon: Literal["INTRADAY", "SWING", "POSITIONAL"] = "SWING",
     capital: float = Query(100_000, gt=0),
     min_stars: int = Query(3, ge=1, le=5),
@@ -111,7 +111,7 @@ async def professional(
     "/stability/{symbol}",
     summary="Current sticky recommendation for a symbol (stability layer state)",
 )
-async def stability_status(
+def stability_status(
     symbol: str,
     horizon: Literal["INTRADAY", "SWING", "POSITIONAL"] = "SWING",
 ):
@@ -125,7 +125,7 @@ async def stability_status(
 
 
 @router.get("/sectors", summary="Sector-level bullish/bearish breakdown")
-async def sectors(
+def sectors(
     horizon: str = "SWING",
     capital: float = 100_000,
     min_confidence: float = 0,

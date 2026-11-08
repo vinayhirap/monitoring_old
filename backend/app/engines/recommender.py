@@ -73,6 +73,10 @@ class RecommendationSet:
 def _score_one(symbol: str, horizon: str, capital: float) -> dict | None:
     try:
         df = get_ohlcv(symbol, periods=250)
+        # Skip dead / circuit-locked / zero-price instruments (zero range -> divide-by-zero)
+        if df is None or len(df) < 30 or float(df["close"].iloc[-1]) <= 0 \
+                or float((df["high"] - df["low"]).tail(20).sum()) <= 0:
+            return {"symbol": symbol, "error": "skipped: flat or zero-price data"}
         return decision.aggregate(symbol=symbol, df=df, horizon=horizon, capital=capital)
     except Exception as e:
         logger.warning("recommender: {} failed: {}", symbol, e)

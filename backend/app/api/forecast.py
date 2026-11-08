@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/symbol/{symbol}", summary="Per-symbol 7/14-day astro+numerology+gann outlook")
-async def symbol_outlook(
+def symbol_outlook(
     symbol: str,
     days: int = Query(7, ge=1, le=30),
     start: date | None = Query(None, description="Default = today"),
@@ -20,7 +20,7 @@ async def symbol_outlook(
 
 
 @router.get("/market", summary="Market-wide weekly calendar (ingresses, Moon, eclipses, Gann)")
-async def market_calendar(
+def market_calendar(
     days: int = Query(7, ge=1, le=30),
     start: date | None = Query(None),
 ):

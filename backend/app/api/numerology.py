@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/symbol/{symbol}", summary="Stock symbol numerology score")
-async def symbol_numerology(symbol: str, ref_date: date | None = Query(None)):
+def symbol_numerology(symbol: str, ref_date: date | None = Query(None)):
     try:
         return numerology.analyze(symbol.upper(), ref_date).to_dict()
     except Exception as e:
@@ -16,7 +16,7 @@ async def symbol_numerology(symbol: str, ref_date: date | None = Query(None)):
 
 
 @router.get("/life-path", summary="Trader personal life-path number")
-async def life_path(dob: date = Query(..., description="YYYY-MM-DD")):
+def life_path(dob: date = Query(..., description="YYYY-MM-DD")):
     try:
         return {"dob": dob.isoformat(), "life_path": numerology.life_path(dob)}
     except Exception as e:

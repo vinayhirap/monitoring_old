@@ -7,6 +7,8 @@ Reference: https://smartapi.angelbroking.com/docs
 """
 from __future__ import annotations
 
+import threading
+import time as _time
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
@@ -15,6 +17,13 @@ from loguru import logger
 
 from app.brokers.base import BrokerBase, BrokerError
 from app.config import settings
+
+
+# Angel One getCandleData allows ~3 req/sec (180/min). The dashboard fires many
+# symbols at once, so serialise candle calls and space them out.
+_CANDLE_LOCK = threading.Lock()
+_CANDLE_MIN_GAP = 0.40          # seconds between candle requests
+_candle_last = 0.0
 
 
 class AngelOneBroker(BrokerBase):
@@ -170,7 +179,7 @@ class AngelOneBroker(BrokerBase):
         if self._paper or not self._client:
             return []
         try:
-            res = self._client.searchScrip(exchange=exchange, searchtext=query)
+            res = self._client.searchScrip(exchange, query)  # positional: SDK param name differs by version
             if isinstance(res, dict) and res.get("status") and res.get("data"):
                 return list(res["data"])
         except Exception as e:
@@ -209,7 +218,15 @@ class AngelOneBroker(BrokerBase):
                 "fromdate": fromdate,         # "YYYY-MM-DD HH:MM"
                 "todate": todate,
             }
-            data = self._client.getCandleData(params)
+            global _candle_last
+            with _CANDLE_LOCK:
+                wait = _CANDLE_MIN_GAP - (_time.time() - _candle_last)
+                if wait > 0:
+                    _time.sleep(wait)
+                try:
+                    data = self._client.getCandleData(params)
+                finally:
+                    _candle_last = _time.time()
             return data.get("data", []) if isinstance(data, dict) else []
         except Exception as e:
             raise BrokerError(f"candles failed: {e}")
@@ -217,7 +234,7 @@ class AngelOneBroker(BrokerBase):
     def option_greeks(self, name: str, expiry: str) -> list[dict]:
         """Pull live option chain greeks via Angel One's optionGreek endpoint.
         name   : underlying (e.g. "NIFTY", "RELIANCE")
-        expiry : "DDMMMYY" upper-cased (e.g. "29MAY25")
+        expiry : "DDMMMYYYY" upper-cased (e.g. "29MAY2025")
 
         Returns list of dicts with: strikePrice, optionType (CE/PE), delta,
         gamma, theta, vega, impliedVolatility, tradeVolume.

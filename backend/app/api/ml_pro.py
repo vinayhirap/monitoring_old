@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 @router.post("/train", summary="Train the LightGBM classifier on the journaled signals (requires ≥500 evaluated)")
-async def train(min_samples: int | None = Query(None, ge=100, le=100000)):
+def train(min_samples: int | None = Query(None, ge=100, le=100000)):
     # Fail fast if journal is empty — no point spinning up LightGBM for 0 samples
     try:
         from app.database import SessionLocal
@@ -45,14 +45,14 @@ async def train(min_samples: int | None = Query(None, ge=100, le=100000)):
 
 
 @router.get("/meta", summary="Last training metadata + feature importance")
-async def meta():
+def meta():
     if not training.META_FILE.exists():
         return {"trained": False, "reason": "Run POST /api/ml/train first"}
     return {"trained": True, **json.loads(Path(training.META_FILE).read_text())}
 
 
 @router.get("/predict/{symbol}", summary="Calibrated probability of profitable 5d outcome")
-async def predict(symbol: str):
+def predict(symbol: str):
     try:
         df = get_ohlcv(symbol, periods=120)
         if df is None or df.empty:
@@ -73,7 +73,7 @@ async def predict(symbol: str):
 
 
 @router.get("/explain/{symbol}", summary="SHAP feature contributions for this symbol's prediction")
-async def explain(symbol: str, top_n: int = Query(10, ge=3, le=30)):
+def explain(symbol: str, top_n: int = Query(10, ge=3, le=30)):
     try:
         df = get_ohlcv(symbol, periods=120)
         if df is None or df.empty:

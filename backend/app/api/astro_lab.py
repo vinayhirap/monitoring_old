@@ -30,7 +30,7 @@ router = APIRouter()
 
 @router.get("/only/{symbol}",
              summary="PURE astrology call — no technical / SMC / options")
-async def astro_only(symbol: str):
+def astro_only(symbol: str):
     """Runs ONLY the astrology layers: Vedic (nakshatra/moon/planets),
     Hora, Gann vibration, numerology. No price action used at all.
     Useful to evaluate astrology in isolation."""
@@ -111,7 +111,7 @@ async def astro_only(symbol: str):
 
 @router.get("/measure/{symbol}",
              summary="Measure pure-astrology hit rate on historical bars")
-async def measure_astro(symbol: str,
+def measure_astro(symbol: str,
                          lookback_bars: int = Query(120, ge=30, le=400)):
     """Walk-forward measurement of astrology's STANDALONE accuracy.
     For each historical day, looks at the day's planetary climate, then
@@ -209,7 +209,7 @@ async def measure_astro(symbol: str,
 
 @router.get("/per-engine/{symbol}",
              summary="Side-by-side measurement of each engine vs astrology")
-async def per_engine(symbol: str,
+def per_engine(symbol: str,
                       lookback_bars: int = Query(150, ge=50, le=400)):
     sym = symbol.upper().strip()
     try:
@@ -220,7 +220,7 @@ async def per_engine(symbol: str,
         rates = report.engine_hit_rates
 
         # Also measure astrology separately
-        astro_res = await measure_astro(symbol=sym, lookback_bars=lookback_bars)
+        astro_res = measure_astro(symbol=sym, lookback_bars=lookback_bars)
         if "hit_rate_pct" in astro_res:
             rates.append({
                 "engine": "astrology",
@@ -252,7 +252,7 @@ async def per_engine(symbol: str,
 
 @router.get("/reversal-dates/{symbol}",
              summary="Next 30 days — flagged reversal windows per Gann time cycles + vibration harmonics")
-async def reversal_dates(symbol: str,
+def reversal_dates(symbol: str,
                           horizon_days: int = Query(30, ge=7, le=180)):
     sym = symbol.upper().strip()
     try:
@@ -355,7 +355,7 @@ async def reversal_dates(symbol: str,
 
 @router.get("/nakshatra-screener",
              summary="Find F&O stocks aligned with today's Moon nakshatra + technical+Gann confluence")
-async def nakshatra_screen(
+def nakshatra_screen(
     direction: str = Query("BOTH", pattern="^(BULLISH|BEARISH|BOTH)$"),
     top_n: int = Query(15, ge=5, le=50),
     only_aligned: bool = Query(True,
@@ -379,7 +379,7 @@ async def nakshatra_screen(
 
 @router.get("/full-confluence/{symbol}",
              summary="One symbol, every engine, all mathematical formulas exposed")
-async def full_confluence_endpoint(symbol: str, periods: int = Query(150, ge=50, le=400)):
+def full_confluence_endpoint(symbol: str, periods: int = Query(150, ge=50, le=400)):
     try:
         df = get_ohlcv(symbol.upper(), periods=periods)
         if df is None or df.empty:
@@ -398,7 +398,7 @@ async def full_confluence_endpoint(symbol: str, periods: int = Query(150, ge=50,
 
 @router.post("/boost-astro",
               summary="Apply preset: astrology weighted at 50% — for experimental purposes")
-async def boost_astro(astro_pct: float = Query(0.50, ge=0.0, le=0.80,
+def boost_astro(astro_pct: float = Query(0.50, ge=0.0, le=0.80,
                                                   description="Astrology weight 0..0.80")):
     """Set astrology to a custom weight (default 50%). Used to test what
     happens when astrology dominates."""

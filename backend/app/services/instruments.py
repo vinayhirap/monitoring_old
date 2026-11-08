@@ -280,6 +280,18 @@ def lookup(symbol: str, exchange: str = "NSE") -> dict | None:
     exch = exchange.upper()
     sym = symbol.upper().strip()
 
+    # 0. Known indices FIRST. The scrip master has legacy junk rows whose
+    #    tradingsymbol is literally "NIFTY" (token 26000, strike -1, empty
+    #    instrumenttype). The real index is the AMXIDX row (99926000).
+    if sym in INDEX_NAME_ALIASES:
+        for nm in INDEX_NAME_ALIASES[sym]:
+            r = _by_name.get((exch, nm.upper()))
+            if r and (r.get("instrumenttype") or "").upper() in ("AMXIDX", "INDEX"):
+                return r
+        r = INDEX_FALLBACK_TOKENS.get((exch, sym))
+        if r:
+            return r
+
     # 1. exact tradingsymbol match
     row = _by_exchange_symbol.get((exch, sym))
     if row:
@@ -500,6 +512,56 @@ def resolve_option_for_order(*, underlying: str, expiry_iso: str, strike: float,
             return ts, token
     # Fallback: construct
     return _format_option_tradingsymbol(underlying, expiry_iso, strike, option_type), None
+
+
+
+# ---------------------------------------------------------------------------
+# Option expiry calendar (read from the scrip master, never hardcode weekdays:
+# NSE has changed index expiry days more than once)
+# ---------------------------------------------------------------------------
+_expiry_cache: dict[tuple[str, str], list] = {}
+
+
+def option_expiries(underlying: str) -> list:
+    """Sorted list of future `date` expiries for an F&O underlying, from the
+    scrip master. Cached per (underlying, today)."""
+    from datetime import date as _date, datetime as _dt
+    if not _loaded:
+        try:
+            load()
+        except Exception:
+            return []
+    today = _date.today()
+    key = (underlying.upper(), today.isoformat())
+    if key in _expiry_cache:
+        return _expiry_cache[key]
+    und = underlying.upper()
+    found: set = set()
+    for (exch, _sym), row in list(_by_exchange_symbol.items()):
+        if exch != "NFO":
+            continue
+        if (row.get("name") or "").upper() != und:
+            continue
+        if (row.get("instrumenttype") or "").upper() not in ("OPTIDX", "OPTSTK"):
+            continue
+        raw = (row.get("expiry") or "").strip()
+        try:
+            d = _dt.strptime(raw.title(), "%d%b%Y").date()
+        except ValueError:
+            continue
+        if d >= today:
+            found.add(d)
+    out = sorted(found)
+    _expiry_cache.clear()          # keep only today's entries
+    _expiry_cache[key] = out
+    return out
+
+
+def nearest_expiry(underlying: str):
+    """Nearest future option expiry (date) for the underlying, or None if the
+    scrip master has no F&O rows for it (no F&O, or master not loaded)."""
+    ex = option_expiries(underlying)
+    return ex[0] if ex else None
 
 
 def all_nse_equity_symbols() -> list[str]:

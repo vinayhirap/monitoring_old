@@ -13,7 +13,7 @@ class TestAlertRequest(BaseModel):
 
 
 @router.get("/status", summary="Alert configuration status")
-async def status():
+def status():
     return {
         "enabled":             os.environ.get("ALERTS_ENABLED", "false"),
         "min_confidence":      os.environ.get("ALERTS_MIN_CONFIDENCE", "75"),
@@ -22,7 +22,7 @@ async def status():
 
 
 @router.post("/test", summary="Send a one-off test alert to Telegram")
-async def test(req: TestAlertRequest):
+def test(req: TestAlertRequest):
     try:
         ok = alerts.send_telegram(f"🔔 {req.message}")
         return {"sent": ok}

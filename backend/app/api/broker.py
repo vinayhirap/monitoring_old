@@ -39,7 +39,7 @@ router = APIRouter()
 
 
 @router.get("/status", summary="Broker connection status")
-async def broker_status():
+def broker_status():
     is_auth = broker_instance.is_authenticated()
     return {
         "broker": broker_instance.name,
@@ -52,7 +52,7 @@ async def broker_status():
 
 
 @router.get("/totp-now", summary="Show the current 6-digit TOTP code generated from .env secret")
-async def totp_now():
+def totp_now():
     """Confirms the secret in .env actually produces a valid 6-digit code.
     The code regenerates every 30 seconds."""
     secret = settings.angelone_totp_secret
@@ -76,7 +76,7 @@ async def totp_now():
 
 
 @router.get("/diagnose", summary="Step-by-step Angel One login diagnostic")
-async def broker_diagnose():
+def broker_diagnose():
     """Walks every login step and reports exactly where (if anywhere) it failed.
     Use this when the badge says 'live blocked' to find the root cause.
     """
@@ -155,7 +155,7 @@ async def broker_diagnose():
 
 
 @router.post("/login", response_model=BrokerLoginResponse, summary="Angel One SmartAPI login")
-async def broker_login(req: BrokerLoginRequest):
+def broker_login(req: BrokerLoginRequest):
     try:
         res = broker_instance.login(
             api_key=req.api_key,
@@ -171,7 +171,7 @@ async def broker_login(req: BrokerLoginRequest):
 
 
 @router.post("/order", response_model=OrderResponse, summary="Place an order (paper or live)")
-async def place_order(req: OrderRequest):
+def place_order(req: OrderRequest):
     try:
         res = broker_instance.place_order(**req.model_dump())
         return OrderResponse(
@@ -188,7 +188,7 @@ async def place_order(req: OrderRequest):
 
 
 @router.delete("/order/{order_id}", summary="Cancel an order")
-async def cancel_order(order_id: str):
+def cancel_order(order_id: str):
     try:
         return broker_instance.cancel_order(order_id)
     except BrokerError as e:
@@ -196,7 +196,7 @@ async def cancel_order(order_id: str):
 
 
 @router.get("/positions", summary="Current open positions")
-async def positions():
+def positions():
     try:
         return {"positions": broker_instance.positions()}
     except BrokerError as e:
@@ -204,7 +204,7 @@ async def positions():
 
 
 @router.get("/holdings", summary="Long-term holdings")
-async def holdings():
+def holdings():
     try:
         return {"holdings": broker_instance.holdings()}
     except BrokerError as e:

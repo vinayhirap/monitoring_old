@@ -18,7 +18,7 @@ router = APIRouter()
 
 @router.get("/measure/{symbol}",
              summary="Measure each engine's hit rate on historical bars (no changes)")
-async def measure(symbol: str,
+def measure(symbol: str,
                    exchange: str = "NSE",
                    lookback_bars: int = Query(150, ge=50, le=500)):
     try:
@@ -43,7 +43,7 @@ class ApplyRequest(BaseModel):
 
 @router.post("/apply",
               summary="Run optimizer + apply suggested weights system-wide")
-async def apply(req: ApplyRequest):
+def apply(req: ApplyRequest):
     try:
         if req.custom_weights:
             # Direct manual override (e.g. user wants to test "astro=0")
@@ -76,7 +76,7 @@ async def apply(req: ApplyRequest):
 
 
 @router.post("/reset", summary="Restore the baseline weights (delete tuned config)")
-async def reset():
+def reset():
     try:
         if weight_optimizer.CONFIG_PATH.exists():
             weight_optimizer.CONFIG_PATH.unlink()
@@ -86,5 +86,5 @@ async def reset():
 
 
 @router.get("/current", summary="Currently-active engine weights + source")
-async def current():
+def current():
     return weight_optimizer.current_config()

@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.get("/current", summary="Current planetary hora + bias")
-async def current_hora(asof: datetime | None = Query(None)):
+def current_hora(asof: datetime | None = Query(None)):
     try:
         return hora_eng.current_hora(asof).to_dict()
     except Exception as e:
@@ -28,7 +28,7 @@ async def current_hora(asof: datetime | None = Query(None)):
         "(e.g. why the market dropped during Saturn hora between 11:40 and 12:45)."
     ),
 )
-async def day_timeline(
+def day_timeline(
     date: Optional[str] = Query(None,
         description="ISO date YYYY-MM-DD; defaults to today (IST)"),
 ):
@@ -71,7 +71,7 @@ async def day_timeline(
         "changes. Returns the surrounding window too."
     ),
 )
-async def next_window(
+def next_window(
     direction: Literal["BUY", "SELL", "NEUTRAL"] = Query("BUY"),
     asof: datetime | None = Query(None),
     lookahead_horas: int = Query(16, ge=1, le=48),
@@ -84,7 +84,7 @@ async def next_window(
 
 
 @router.get("/validate-strategy", summary="Test the consistency validator against any strategy")
-async def validate_strategy(
+def validate_strategy(
     strategy_type: str = Query(..., examples=["OPT_CE_BUY"]),
     symbol_astro_bias: str = "BULLISH",
     numerology_bias: str = "BULLISH",

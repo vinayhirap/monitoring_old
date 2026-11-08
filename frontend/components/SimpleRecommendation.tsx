@@ -2,7 +2,7 @@
 
 import {
   TrendingUp, TrendingDown, Minus, Target, Shield, Clock, ChevronDown, ChevronUp,
-  AlertTriangle, BarChart3, Sparkles, ArrowRight, Info, ShieldAlert, Ban,
+  AlertTriangle, BarChart3, Sparkles, ArrowRight, Info, ShieldAlert, Ban, Star,
 } from "lucide-react";
 import Link from "next/link";
 import clsx from "clsx";

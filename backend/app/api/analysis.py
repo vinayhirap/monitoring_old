@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.post("/full", summary="Run full multi-engine analysis on a symbol")
-async def full_analysis(req: AnalysisRequest):
+def full_analysis(req: AnalysisRequest):
     try:
         df = get_ohlcv(req.symbol, exchange=req.exchange, periods=250)
         result = decision.aggregate(

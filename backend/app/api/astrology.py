@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/transits", summary="Live planetary positions (sidereal Lahiri)")
-async def transits(asof: datetime | None = Query(None, description="ISO datetime; defaults to now")):
+def transits(asof: datetime | None = Query(None, description="ISO datetime; defaults to now")):
     try:
         return astrology.transits_snapshot(asof)
     except Exception as e:
@@ -16,7 +16,7 @@ async def transits(asof: datetime | None = Query(None, description="ISO datetime
 
 
 @router.get("/market-sentiment", summary="Aggregated bullish/bearish planetary read")
-async def market_sentiment(asof: datetime | None = Query(None)):
+def market_sentiment(asof: datetime | None = Query(None)):
     try:
         return astrology.market_sentiment(asof).to_dict()
     except Exception as e:
@@ -24,7 +24,7 @@ async def market_sentiment(asof: datetime | None = Query(None)):
 
 
 @router.get("/moon-phase", summary="Current Moon phase + tithi + paksha")
-async def moon_phase_endpoint(asof: datetime | None = Query(None)):
+def moon_phase_endpoint(asof: datetime | None = Query(None)):
     try:
         return astrology.moon_phase(asof or datetime.utcnow())
     except Exception as e:

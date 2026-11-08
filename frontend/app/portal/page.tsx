@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { authedFetcher, authedFetch } from "@/lib/auth";
 import { fetcher } from "@/lib/api";
 import {
-  TrendingUp, Plus, X, ArrowRight, Activity, Sparkles, Moon,
+  TrendingUp, Plus, X, ArrowRight, Activity, Sparkles, Moon, Star,
 } from "lucide-react";
 import { SentimentGauge } from "@/components/SentimentGauge";
 import { PickCardCompact } from "@/components/PickCard";
