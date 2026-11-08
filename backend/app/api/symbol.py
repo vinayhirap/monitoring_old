@@ -33,6 +33,7 @@ from app.engines import (
 from app.services import instruments, risk_guard, calibration_fit, price_sanity
 from app.services import online_learner, recommendation_quality
 from app.services.market_data import get_ohlcv, LiveDataUnavailable
+from app.engines import vol_forecast
 
 router = APIRouter()
 
@@ -340,6 +341,7 @@ def symbol_detail(
             pivots=pivots_block,
             quant=quant_block,
             target_1=(plan.targets[0] if plan.targets else None),
+            price_df=df,
         )
         # If SL engine produced a more defensible SL, override plan.stoploss
         # so the visible recommendation reflects the better number. The
@@ -726,7 +728,8 @@ def _safe_explanation(full_data: dict, hide_astrology: bool = False,
 def _safe_stop_loss(*, entry: float, direction: str, atr: float,
                       fib: dict | None, advanced_ta: dict | None,
                       gann_natural: dict | None, pivots: dict | None,
-                      quant: dict | None, target_1: float | None) -> dict | None:
+                      quant: dict | None, target_1: float | None,
+                      price_df=None) -> dict | None:
     """Run the multi-method SL engine. Always returns a dict (errors come
     back as {error, recommended_method: 'ATR_FALLBACK'}) so the API contract
     stays predictable."""
@@ -744,8 +747,17 @@ def _safe_stop_loss(*, entry: float, direction: str, atr: float,
         swing_high = (fib or {}).get("swing_high") if fib else None
         # Pull VWAP from advanced_ta block
         vwap_block = (advanced_ta or {}).get("vwap") if advanced_ta else None
+        # Volatility forecast (HAR/EWMA). Never blocks the SL if it fails.
+        vol_sigma_pct = None
+        try:
+            vf = vol_forecast.forecast(price_df) if price_df is not None else None
+            if vf is not None and vf.ok:
+                vol_sigma_pct = vf.sigma_day_pct
+        except Exception as e:
+            logger.debug("vol_forecast skipped: {}", e)
         report = stop_loss_engine.compute(
             entry=entry, direction=direction, atr=atr,
+            vol_sigma_pct=vol_sigma_pct,
             swing_low=swing_low, swing_high=swing_high,
             vwap_block=vwap_block,
             fib_fractal_block=fib,

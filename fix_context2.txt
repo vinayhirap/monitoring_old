@@ -1,0 +1,304 @@
+
+##### app/engines/strategy.py  lines 252-346
+ 252: def select(
+ 253:     symbol: str,
+ 254:     spot: float,
+ 255:     direction: str,                          # BULLISH / BEARISH / SIDEWAYS
+ 256:     confidence: float,                       # 0..100
+ 257:     atr: float,
+ 258:     iv_pct: float | None = None,             # nearest ATM IV %
+ 259:     options_bias: str = "NEUTRAL",
+ 260:     horizon: Horizon = "SWING",
+ 261:     capital: float = 100_000,
+ 262:     max_position_pct: float = 5.0,
+ 263:     is_fno: bool = True,
+ 264:     lot_size: int = 1,
+ 265:     attach_timing: bool = True,              # compute Hora-based entry window
+ 266:     vibration_score: float | None = None,    # 0..100 — Gann vibration confluence
+ 267:     # ---- New: smart-entry inputs (optional — old callers still work) ----
+ 268:     gann_support: float | None = None,       # nearest Gann support BELOW spot
+ 269:     gann_resistance: float | None = None,    # nearest Gann resistance ABOVE spot
+ 270:     recent_candles: list[dict] | None = None,  # last 5+ OHLC rows for confirmation
+ 271: ) -> StrategyPlan:
+ 272: 
+ 273:     notes: list[str] = []
+ 274:     iv = iv_pct if iv_pct is not None else 20.0
+ 275: 
+ 276:     # ----------------------------------------------------------
+ 277:     # Map direction + confidence + IV regime → strategy
+ 278:     # ----------------------------------------------------------
+ 279:     strategy: StrategyType = "WAIT"
+ 280: 
+ 281:     if direction == "BULLISH":
+ 282:         if confidence < 55:
+ 283:             strategy = "WAIT"
+ 284:             notes.append("Bullish lean but confidence below 55 — wait for confirmation")
+ 285:         elif iv < 18:
+ 286:             strategy = "OPT_CE_BUY" if is_fno else "EQUITY_BUY"
+ 287:             notes.append("Low IV — calls are cheap, buy outright")
+ 288:         elif iv < 28:
+ 289:             strategy = "OPT_BULL_CALL_SPREAD" if is_fno else "EQUITY_BUY"
+ 290:             notes.append("Mid IV — bull-call spread caps cost while keeping upside")
+ 291:         elif iv >= 28 and confidence >= 70:
+ 292:             strategy = "FUT_LONG" if is_fno else "EQUITY_BUY"
+ 293:             notes.append("High IV makes option premia expensive — use futures for directional bet")
+ 294:         else:
+ 295:             strategy = "EQUITY_BUY"
+ 296: 
+ 297:     elif direction == "BEARISH":
+ 298:         if confidence < 55:
+ 299:             strategy = "WAIT"
+ 300:             notes.append("Bearish lean but confidence below 55 — wait for confirmation")
+ 301:         elif iv < 18:
+ 302:             strategy = "OPT_PE_BUY" if is_fno else "EQUITY_SHORT"
+ 303:             notes.append("Low IV — puts are cheap, buy outright")
+ 304:         elif iv < 28:
+ 305:             strategy = "OPT_BEAR_PUT_SPREAD" if is_fno else "EQUITY_SHORT"
+ 306:             notes.append("Mid IV — bear-put spread caps cost while keeping downside")
+ 307:         elif iv >= 28 and confidence >= 70:
+ 308:             strategy = "FUT_SHORT" if is_fno else "EQUITY_SHORT"
+ 309:             notes.append("High IV expensive — use futures for directional bet")
+ 310:         else:
+ 311:             strategy = "EQUITY_SHORT"
+ 312: 
+ 313:     else:  # SIDEWAYS
+ 314:         if iv >= 30 and is_fno:
+ 315:             strategy = "OPT_IRON_CONDOR"
+ 316:             notes.append("Range-bound + elevated IV — sell premium with defined risk (iron condor)")
+ 317:         elif iv >= 35 and is_fno:
+ 318:             strategy = "OPT_SHORT_STRANGLE"
+ 319:             notes.append("Very high IV — short strangle premium decay play (margin intensive)")
+ 320:         elif iv < 15 and is_fno:
+ 321:             strategy = "OPT_LONG_STRADDLE"
+ 322:             notes.append("Compressed IV — expect expansion, buy straddle")
+ 323:         else:
+ 324:             strategy = "WAIT"
+ 325:             notes.append("Sideways with mid IV — no edge")
+ 326: 
+ 327:     # ----------------------------------------------------------
+ 328:     # Compute entry / SL / target by strategy type
+ 329:     #
+ 330:     # `entry` is no longer just `spot` — _smart_entry picks the right trigger
+ 331:     # price based on Gann support/resistance + ATR + consecutive-candle
+ 332:     # confirmation. For directional strategies the SL is anchored BELOW the
+ 333:     # entry trigger (not the LTP) so a pullback entry doesn't blow stops on
+ 334:     # the same retracement that gave the entry.
+ 335:     # ----------------------------------------------------------
+ 336:     smart = _smart_entry(
+ 337:         spot=spot, direction=direction, atr=atr,
+ 338:         gann_support=gann_support, gann_resistance=gann_resistance,
+ 339:         recent_candles=recent_candles,
+ 340:     )
+ 341:     entry = smart["entry"]
+ 342: 
+ 343:     if strategy in ("EQUITY_BUY", "FUT_LONG", "OPT_CE_BUY"):
+ 344:         # SL below the structural support if we know one, else 1.5×ATR below entry
+ 345:         sl_struct = (gann_support * 0.995) if (gann_support and gann_support > 0
+ 346:                                                 and gann_support < entry) else None
+
+##### app/engines/strategy.py  lines 374-440
+ 374: 
+ 375:     risk = abs(entry - stoploss) if stoploss else 0
+ 376:     reward = abs(targets[0] - entry) if targets else 0
+ 377:     rr = round(reward / risk, 2) if risk > 0 else 0.0
+ 378: 
+ 379:     # ----------------------------------------------------------
+ 380:     # Position sizing
+ 381:     # ----------------------------------------------------------
+ 382:     if strategy == "WAIT":
+ 383:         qty = 0
+ 384:         cap_alloc_pct = 0.0
+ 385:         cap_required = 0.0
+ 386:     else:
+ 387:         cap_alloc_pct = round(min(max_position_pct, (confidence - 50) / 50 * max_position_pct), 2)
+ 388:         cap_alloc_pct = max(0.0, cap_alloc_pct)
+ 389:         cap_required = capital * cap_alloc_pct / 100
+ 390:         per_unit_cost = entry if strategy in ("EQUITY_BUY", "EQUITY_SHORT") else max(atr * 5, 50)
+ 391:         qty = max(0, int(cap_required // per_unit_cost))
+ 392:         # round to lot size for derivatives
+ 393:         if strategy not in ("EQUITY_BUY", "EQUITY_SHORT") and lot_size > 1:
+ 394:             qty = max(lot_size, (qty // lot_size) * lot_size)
+ 395: 
+ 396:     expected_max_profit = abs((targets[0] - entry) * qty) if targets else 0
+ 397:     expected_max_loss = risk * qty if risk else 0
+ 398: 
+ 399:     # ----------------------------------------------------------
+ 400:     # Instrument legs (for options spreads — informational)
+ 401:     # ----------------------------------------------------------
+ 402:     legs: list[dict] = []
+ 403:     atm = round(spot / 50) * 50
+ 404:     if strategy == "OPT_CE_BUY":
+ 405:         legs = [{"action": "BUY", "type": "CE", "strike": atm}]
+ 406:     elif strategy == "OPT_PE_BUY":
+ 407:         legs = [{"action": "BUY", "type": "PE", "strike": atm}]
+ 408:     elif strategy == "OPT_BULL_CALL_SPREAD":
+ 409:         legs = [
+ 410:             {"action": "BUY", "type": "CE", "strike": atm},
+ 411:             {"action": "SELL", "type": "CE", "strike": atm + 100},
+ 412:         ]
+ 413:     elif strategy == "OPT_BEAR_PUT_SPREAD":
+ 414:         legs = [
+ 415:             {"action": "BUY", "type": "PE", "strike": atm},
+ 416:             {"action": "SELL", "type": "PE", "strike": atm - 100},
+ 417:         ]
+ 418:     elif strategy == "OPT_IRON_CONDOR":
+ 419:         legs = [
+ 420:             {"action": "SELL", "type": "CE", "strike": atm + 100},
+ 421:             {"action": "BUY",  "type": "CE", "strike": atm + 200},
+ 422:             {"action": "SELL", "type": "PE", "strike": atm - 100},
+ 423:             {"action": "BUY",  "type": "PE", "strike": atm - 200},
+ 424:         ]
+ 425:     elif strategy == "OPT_LONG_STRADDLE":
+ 426:         legs = [
+ 427:             {"action": "BUY", "type": "CE", "strike": atm},
+ 428:             {"action": "BUY", "type": "PE", "strike": atm},
+ 429:         ]
+ 430:     elif strategy == "OPT_SHORT_STRANGLE":
+ 431:         legs = [
+ 432:             {"action": "SELL", "type": "CE", "strike": atm + 150},
+ 433:             {"action": "SELL", "type": "PE", "strike": atm - 150},
+ 434:         ]
+ 435: 
+ 436:     rationale = _rationale(strategy, direction, confidence, iv)
+ 437: 
+ 438:     # ---------- Per-signal "why this strategy" explainer ----------
+ 439:     why = _why_this_strategy(strategy, direction, confidence, iv, atr,
+ 440:                               rr, vibration_score, horizon)
+
+##### grep /^class |Column\(|mapped_column|__tablename__/ in app/models/trade.py
+   4: from sqlalchemy.orm import Mapped, mapped_column
+   9: class Trade(Base):
+  10:     __tablename__ = "trades"
+  12:     id: Mapped[int] = mapped_column(primary_key=True)
+  13:     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+  14:     signal_id: Mapped[int | None] = mapped_column(ForeignKey("signals.id"), nullable=True)
+  16:     broker: Mapped[str] = mapped_column(String(32), default="angelone")
+  17:     broker_order_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+  18:     symbol: Mapped[str] = mapped_column(String(32), index=True)
+  19:     exchange: Mapped[str] = mapped_column(String(16), default="NSE")
+  20:     instrument_type: Mapped[str] = mapped_column(String(16), default="EQ")  # EQ/FUT/CE/PE
+  21:     side: Mapped[str] = mapped_column(String(8))                            # BUY/SELL
+  22:     qty: Mapped[int] = mapped_column(Integer)
+  23:     price: Mapped[float] = mapped_column(Float)
+  24:     status: Mapped[str] = mapped_column(String(16), default="PENDING")      # PENDING/FILLED/CANCELLED/REJECTED
+  25:     is_paper: Mapped[bool] = mapped_column(Boolean, default=True)
+  27:     pnl: Mapped[float] = mapped_column(Float, default=0.0)
+  28:     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+  29:     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+##### grep /^class |Column\(|mapped_column|__tablename__/ in app/models/trade_execution.py
+  51: class Order(Base):
+  69:     __tablename__ = "exec_orders"
+  71:     id              = Column(Integer, primary_key=True, autoincrement=True)
+  72:     user_id         = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+  75:     source_signal_id = Column(Integer, index=True, nullable=True)
+  76:     source_type     = Column(String(16), default="MANUAL", index=True)
+  79:     client_order_id = Column(String(64), unique=True, index=True, nullable=False)
+  82:     symbol          = Column(String(32), index=True, nullable=False)
+  83:     exchange        = Column(String(8),  default="NSE")
+  84:     direction       = Column(String(8),  nullable=False)        # BUY / SELL
+  85:     quantity        = Column(Integer,    nullable=False)
+  86:     product_type    = Column(String(16), default="DELIVERY")    # DELIVERY/INTRADAY/MARGIN
+  87:     order_type      = Column(String(16), default="MARKET")      # MARKET/LIMIT/SL/SL-M
+  88:     price           = Column(Float, nullable=True)              # LIMIT price
+  89:     trigger_price   = Column(Float, nullable=True)              # for SL / SL-M
+  93:     stoploss        = Column(Float, nullable=True)
+  94:     target_1        = Column(Float, nullable=True)
+  95:     target_2        = Column(Float, nullable=True)
+  96:     target_3        = Column(Float, nullable=True)
+  99:     status          = Column(String(24), default=ORDER_STATUS_PENDING_RISK, index=True)
+ 100:     placed_at       = Column(DateTime, server_default=func.now(), index=True)
+ 101:     updated_at      = Column(DateTime, server_default=func.now(), onupdate=func.now())
+ 102:     filled_at       = Column(DateTime, nullable=True)
+ 103:     cancelled_at    = Column(DateTime, nullable=True)
+ 106:     broker_order_id = Column(String(64), index=True, nullable=True)
+ 107:     broker_response = Column(JSON, nullable=True)
+ 108:     broker_status   = Column(String(32), nullable=True)
+ 111:     filled_quantity = Column(Integer, default=0)
+ 112:     avg_fill_price  = Column(Float, nullable=True)
+ 113:     realized_pnl    = Column(Float, default=0.0)
+ 116:     risk_guard_snapshot = Column(JSON, nullable=True)
+ 119:     is_paper        = Column(Boolean, default=True, index=True)
+ 121:     notes           = Column(String(512), nullable=True)
+ 131:     multi_leg_group_id = Column(String(64), index=True, nullable=True)
+ 132:     leg_index          = Column(Integer, nullable=True)
+ 142: class Position(Base):
+ 146:     __tablename__ = "exec_positions"
+ 148:     id              = Column(Integer, primary_key=True, autoincrement=True)
+ 149:     user_id         = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+ 150:     symbol          = Column(String(32), index=True, nullable=False)
+ 151:     exchange        = Column(String(8),  default="NSE")
+ 152:     product_type    = Column(String(16), default="DELIVERY")
+ 155:     net_quantity    = Column(Integer, default=0)
+ 156:     avg_entry_price = Column(Float, default=0.0)        # weighted across fills
+ 159:     current_sl      = Column(Float, nullable=True)
+ 160:     current_t1      = Column(Float, nullable=True)
+ 161:     current_t2      = Column(Float, nullable=True)
+ 162:     current_t3      = Column(Float, nullable=True)
+ 165:     opened_at       = Column(DateTime, server_default=func.now())
+ 166:     closed_at       = Column(DateTime, nullable=True)
+ 167:     status          = Column(String(16), default="OPEN", index=True)
+ 170:     realized_pnl    = Column(Float, default=0.0)
+ 172:     is_paper        = Column(Boolean, default=True, index=True)
+ 180: class TradeFill(Base):
+ 182:     __tablename__ = "exec_trade_fills"
+ 184:     id              = Column(Integer, primary_key=True, autoincrement=True)
+ 185:     order_id        = Column(Integer, ForeignKey("exec_orders.id"), index=True, nullable=False)
+ 186:     user_id         = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+ 188:     symbol          = Column(String(32), index=True, nullable=False)
+ 189:     direction       = Column(String(8),  nullable=False)
+ 190:     quantity        = Column(Integer, nullable=False)
+ 191:     price           = Column(Float, nullable=False)
+ 193:     filled_at       = Column(DateTime, server_default=func.now(), index=True)
+ 195:     broker_trade_id = Column(String(64), nullable=True)
+ 196:     broker_response = Column(JSON, nullable=True)
+ 199:     fill_type       = Column(String(8), default="OPEN")
+ 200:     realized_pnl    = Column(Float, default=0.0)        # only non-zero for REDUCE/CLOSE
+ 202:     is_paper        = Column(Boolean, default=True, index=True)
+
+##### app/services/risk_guard.py  lines 250-310
+ 250: # ---------------------------------------------------------------------------
+ 251: # Helpers to compute the context fields (portfolio open risk, recent losses)
+ 252: # from existing tables. Both are read-only and cheap; safe to call inline.
+ 253: # ---------------------------------------------------------------------------
+ 254: 
+ 255: def open_portfolio_risk_pct(db, user_id: int, capital: float) -> float:
+ 256:     """Sum risk-at-stop across the user's active portfolio positions.
+ 257:     Returns a percent of capital figure.
+ 258: 
+ 259:     Defensive: if the portfolio model is unavailable / table empty, returns 0.
+ 260:     """
+ 261:     try:
+ 262:         from app.models.portfolio import Position    # type: ignore
+ 263:         positions = db.query(Position).filter_by(user_id=user_id, status="OPEN").all()
+ 264:         if not positions or capital <= 0:
+ 265:             return 0.0
+ 266:         total_risk = 0.0
+ 267:         for p in positions:
+ 268:             sl_dist = abs((p.entry_price or 0) - (p.stop_loss or 0))
+ 269:             total_risk += sl_dist * (p.quantity or 0)
+ 270:         return round(total_risk / capital * 100, 3)
+ 271:     except Exception as e:
+ 272:         logger.debug("open_portfolio_risk_pct unavailable: {}", e)
+ 273:         return 0.0
+ 274: 
+ 275: 
+ 276: def recent_loss_count(db, user_id: int, lookback_days: int = LOSS_LOOKBACK_DAYS) -> int:
+ 277:     """Count closed-losing trades for the user in the lookback window."""
+ 278:     try:
+ 279:         from app.models.portfolio import Position    # type: ignore
+ 280:         cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+ 281:         rows = (db.query(Position)
+ 282:                   .filter(Position.user_id == user_id,
+ 283:                            Position.status == "CLOSED",
+ 284:                            Position.closed_at >= cutoff,
+ 285:                            Position.realized_pnl < 0)
+ 286:                   .count())
+ 287:         return int(rows)
+ 288:     except Exception as e:
+ 289:         logger.debug("recent_loss_count unavailable: {}", e)
+ 290:         return 0
+
+##### callers
+app\services\trade_executor.py:154: open_risk_pct = risk_guard.open_portfolio_risk_pct(db, intent.user_id, intent.capital)
+app\services\trade_executor.py:155: recent_losses = risk_guard.recent_loss_count(db, intent.user_id)

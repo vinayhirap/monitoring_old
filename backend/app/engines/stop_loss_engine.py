@@ -110,6 +110,30 @@ def _atr_candidate(*, entry: float, atr: float, direction: Direction,
     )
 
 
+def _vol_forecast_candidate(*, entry: float, direction: Direction,
+                             sigma_pct: float, horizon_frac: float = 1.0,
+                             k: float = 1.5) -> Optional[StopLossCandidate]:
+    """Stop at k x forecast 1-sigma move over the holding horizon.
+
+    Unlike ATR (a backward-looking average), sigma comes from the HAR/EWMA
+    volatility forecast, so the stop widens before a volatile session and
+    tightens in a quiet one. Sizes risk; says nothing about direction.
+    """
+    if sigma_pct <= 0 or entry <= 0:
+        return None
+    dist_pct = k * sigma_pct * (max(horizon_frac, 0.0) ** 0.5)
+    distance = entry * dist_pct / 100.0
+    sl_price = entry - distance if direction == "BULLISH" else entry + distance
+    return StopLossCandidate(
+        method="VOLFC",
+        price=round(sl_price, 2),
+        distance_pct=round(dist_pct, 3),
+        rationale=(f"{k}x forecast 1-sigma move ({sigma_pct:.2f}%/session, "
+                   f"horizon {horizon_frac:.2f} session) - volatility-forecast stop"),
+        defensibility=3,
+    )
+
+
 def _structural_candidate(*, entry: float, direction: Direction,
                             recent_swing_low: float, recent_swing_high: float,
                             buffer_pct: float = 0.15) -> Optional[StopLossCandidate]:
@@ -285,6 +309,9 @@ def compute(*, entry: float, direction: str, atr: float,
              pivots_block: Optional[dict] = None,
              vol_regime: str = "NORMAL",
              target_1: Optional[float] = None,
+             vol_sigma_pct: Optional[float] = None,
+             vol_horizon_frac: float = 1.0,
+             vol_k: float = 1.5,
              ) -> StopLossReport:
     """Compute the comprehensive SL report.
 
@@ -307,11 +334,26 @@ def compute(*, entry: float, direction: str, atr: float,
 
     dir_typed: Direction = direction    # type: ignore
 
+    if not entry or entry <= 0:
+        return StopLossReport(
+            direction=dir_typed, entry=0.0, recommended_sl=0.0,
+            recommended_method="INVALID_ENTRY", distance_pct=0.0,
+            confluence_count=0, confluence_low=None, confluence_high=None,
+            candidates=[], reasons=["Entry price is zero or negative - no stop computed"],
+            warnings=["Invalid entry price; check the data feed before trading"],
+        )
+
     # Collect candidates from each method
     candidates: list[StopLossCandidate] = []
 
     c = _atr_candidate(entry=entry, atr=atr, direction=dir_typed, vol_regime=vol_regime)
     if c: candidates.append(c)
+
+    if vol_sigma_pct:
+        c = _vol_forecast_candidate(entry=entry, direction=dir_typed,
+                                    sigma_pct=vol_sigma_pct,
+                                    horizon_frac=vol_horizon_frac, k=vol_k)
+        if c: candidates.append(c)
 
     if swing_low is not None and swing_high is not None:
         c = _structural_candidate(
@@ -428,6 +470,19 @@ def compute(*, entry: float, direction: str, atr: float,
         confluence_count = 1
         confluence_low = confluence_high = None
         reasons.append(f"Best single-method stop: {chosen.method} — {chosen.rationale}")
+
+    # ---------------------------------------------------------------
+    # Noise check - a stop inside normal forecast volatility gets swept
+    # ---------------------------------------------------------------
+    if vol_sigma_pct:
+        horizon_sigma = vol_sigma_pct * (max(vol_horizon_frac, 0.0) ** 0.5)
+        stop_pct = abs(entry - recommended_sl) / entry * 100
+        if horizon_sigma > 0 and stop_pct < 0.75 * horizon_sigma:
+            warnings.append(
+                f"Stop is only {stop_pct:.2f}% away but the forecast 1-sigma move "
+                f"over your horizon is {horizon_sigma:.2f}%. Ordinary noise is likely "
+                f"to hit it - widen the stop (and cut size) or skip the trade."
+            )
 
     # ---------------------------------------------------------------
     # R:R sanity check — if R:R drops below 1.2 with this SL, warn

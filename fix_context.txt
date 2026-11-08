@@ -1,0 +1,385 @@
+
+##### app/engines/stop_loss_engine.py  lines 85-135
+  85:                 "candidates": [
+  86:                     c if isinstance(c, dict) else c.__dict__ for c in self.candidates
+  87:                 ]}
+  88: 
+  89: 
+  90: # ---------------------------------------------------------------------------
+  91: # Per-method candidate builders
+  92: # ---------------------------------------------------------------------------
+  93: 
+  94: def _atr_candidate(*, entry: float, atr: float, direction: Direction,
+  95:                     vol_regime: str = "NORMAL") -> Optional[StopLossCandidate]:
+  96:     """ATR-based SL. Multiplier depends on volatility regime:
+  97:        LOW_VOL → 1.5×ATR, NORMAL → 2.0×ATR, HIGH_VOL → 2.5×ATR.
+  98:     """
+  99:     if atr <= 0:
+ 100:         return None
+ 101:     mult = 1.5 if vol_regime == "LOW_VOL" else 2.5 if vol_regime == "HIGH_VOL" else 2.0
+ 102:     distance = mult * atr
+ 103:     sl_price = entry - distance if direction == "BULLISH" else entry + distance
+ 104:     return StopLossCandidate(
+ 105:         method="ATR",
+ 106:         price=round(sl_price, 2),
+ 107:         distance_pct=round(distance / entry * 100, 3),
+ 108:         rationale=f"{mult}× ATR({atr:.2f}) — volatility-scaled stop",
+ 109:         defensibility=2,
+ 110:     )
+ 111: 
+ 112: 
+ 113: def _structural_candidate(*, entry: float, direction: Direction,
+ 114:                             recent_swing_low: float, recent_swing_high: float,
+ 115:                             buffer_pct: float = 0.15) -> Optional[StopLossCandidate]:
+ 116:     """Below recent swing low (long) or above swing high (short).
+ 117:     Adds a small buffer (default 0.15%) so a wick at the level doesn't trigger.
+ 118: 
+ 119:     Returns None if the swing point isn't in a sensible direction relative
+ 120:     to entry (e.g., a long's swing low is above entry — degenerate)."""
+ 121:     if direction == "BULLISH":
+ 122:         if recent_swing_low <= 0 or recent_swing_low >= entry:
+ 123:             return None
+ 124:         sl = recent_swing_low * (1 - buffer_pct / 100)
+ 125:     else:
+ 126:         if recent_swing_high <= 0 or recent_swing_high <= entry:
+ 127:             return None
+ 128:         sl = recent_swing_high * (1 + buffer_pct / 100)
+ 129:     distance = abs(entry - sl)
+ 130:     return StopLossCandidate(
+ 131:         method="STRUCTURAL",
+ 132:         price=round(sl, 2),
+ 133:         distance_pct=round(distance / entry * 100, 3),
+ 134:         rationale=(f"Below recent swing low ₹{recent_swing_low:.2f} "
+ 135:                      f"(with {buffer_pct}% buffer)" if direction == "BULLISH"
+
+##### app/engines/stop_loss_engine.py  lines 290-345
+ 290: 
+ 291:     Required inputs:
+ 292:       entry        — recommended entry price
+ 293:       direction    — BULLISH or BEARISH
+ 294:       atr          — ATR(14) value for ATR-based fallback
+ 295: 
+ 296:     Optional inputs (each enables one more method):
+ 297:       swing_low / swing_high   → STRUCTURAL method
+ 298:       vwap_block               → VWAP method (must have vwap + 1σ bands)
+ 299:       fib_fractal_block        → FIB method (uses confluence_zones)
+ 300:       gann_natural_block       → GANN method
+ 301:       pivots_block             → PIVOT method (uses 'daily' Camarilla / Standard)
+ 302:       vol_regime               → adjusts ATR multiplier (LOW_VOL/NORMAL/HIGH_VOL)
+ 303:       target_1                 → enables R:R sanity check
+ 304:     """
+ 305:     if direction not in ("BULLISH", "BEARISH"):
+ 306:         raise ValueError(f"direction must be BULLISH or BEARISH, got {direction!r}")
+ 307: 
+ 308:     dir_typed: Direction = direction    # type: ignore
+ 309: 
+ 310:     # Collect candidates from each method
+ 311:     candidates: list[StopLossCandidate] = []
+ 312: 
+ 313:     c = _atr_candidate(entry=entry, atr=atr, direction=dir_typed, vol_regime=vol_regime)
+ 314:     if c: candidates.append(c)
+ 315: 
+ 316:     if swing_low is not None and swing_high is not None:
+ 317:         c = _structural_candidate(
+ 318:             entry=entry, direction=dir_typed,
+ 319:             recent_swing_low=swing_low, recent_swing_high=swing_high,
+ 320:         )
+ 321:         if c: candidates.append(c)
+ 322: 
+ 323:     if vwap_block:
+ 324:         c = _vwap_candidate(
+ 325:             entry=entry, direction=dir_typed,
+ 326:             vwap=vwap_block.get("vwap", 0),
+ 327:             vwap_lower_1sigma=vwap_block.get("lower_1sigma", 0),
+ 328:             vwap_upper_1sigma=vwap_block.get("upper_1sigma", 0),
+ 329:         )
+ 330:         if c: candidates.append(c)
+ 331: 
+ 332:     if fib_fractal_block:
+ 333:         c = _fib_candidate(
+ 334:             entry=entry, direction=dir_typed,
+ 335:             confluence_zones=fib_fractal_block.get("confluence_zones", []),
+ 336:         )
+ 337:         if c: candidates.append(c)
+ 338: 
+ 339:     if gann_natural_block:
+ 340:         c = _gann_candidate(
+ 341:             entry=entry, direction=dir_typed,
+ 342:             gann_natural=gann_natural_block,
+ 343:         )
+ 344:         if c: candidates.append(c)
+ 345: 
+
+##### grep /def estimate_required_margin/ in ['app/services/*.py']
+-- app\services\funds_check.py:108
+ 108: def estimate_required_margin(*, entry: float, quantity: int,
+ 109:                                product_type: str, is_fno: bool = False) -> tuple[float, str]:
+ 110:     """Best-effort margin estimate without hitting the broker.
+ 111: 
+ 112:     Returns (required_margin_in_rupees, source_label).
+ 113:     """
+ 114:     notional = entry * quantity
+ 115:     if is_fno:
+ 116:         return notional * FNO_MARGIN_FRACTION, "fallback_fno_approx"
+ 117:     if product_type in ("INTRADAY", "MIS"):
+ 118:         return notional * EQUITY_INTRADAY_MARGIN_FRACTION, "fallback_equity_intraday"
+ 119:     # DELIVERY / CNC / NRML / MARGIN — assume full cash required (safest)
+ 120:     return notional * EQUITY_DELIVERY_MARGIN_FRACTION, "fallback_equity_delivery"
+ 121: 
+ 122: 
+ 123: def check(*, entry: float, quantity: int, product_type: str = "DELIVERY",
+ 124:             is_fno: bool = False) -> FundsCheckResult:
+ 125:     """Pre-trade check. Combines broker's reported cash with a notional-based
+ 126:     margin estimate to decide whether the trade can be afforded.
+ 127: 
+ 128:     Always returns a FundsCheckResult — never raises. When the broker isn't
+ 129:     available, returns sufficient=True with a warning so the executor can
+ 130:     decide to soft-allow (the order will then get rejected at the broker
+ 131:     if funds are insufficient — same as today, just with a clear warning).
+ 132:     """
+ 133:     notional = entry * quantity
+ 134:     required_margin, source = estimate_required_margin(
+ 135:         entry=entry, quantity=quantity, product_type=product_type, is_fno=is_fno,
+ 136:     )
+ 137: 
+ 138:     funds = _fetch_broker_funds()
+
+##### grep /estimate_required_margin\(/ in ['app/**/*.py']
+-- app\services\funds_check.py:108
+ 107: 
+ 108: def estimate_required_margin(*, entry: float, quantity: int,
+ 109:                                product_type: str, is_fno: bool = False) -> tuple[float, str]:
+ 110:     """Best-effort margin estimate without hitting the broker.
+ 111: 
+-- app\services\funds_check.py:134
+ 133:     notional = entry * quantity
+ 134:     required_margin, source = estimate_required_margin(
+ 135:         entry=entry, quantity=quantity, product_type=product_type, is_fno=is_fno,
+ 136:     )
+ 137: 
+
+##### tests/test_services.py  lines 60-85
+  60:                                                   product_type="INTRADAY")
+  61:         assert abs(margin - 40_000) < 0.01
+  62:         assert src == "fallback_equity_intraday"
+  63: 
+  64:     def test_estimate_required_margin_delivery(self):
+  65:         from app.services.funds_check import estimate_required_margin
+  66:         # Delivery requires 100% cash
+  67:         margin, src = estimate_required_margin(entry=2000, quantity=100,
+  68:                                                   product_type="DELIVERY")
+  69:         assert abs(margin - 200_000) < 0.01
+  70:         assert src == "fallback_equity_delivery"
+  71: 
+  72:     def test_estimate_required_margin_fno(self):
+  73:         from app.services.funds_check import estimate_required_margin
+  74:         # F&O ~15% margin estimate
+  75:         margin, src = estimate_required_margin(entry=100, quantity=750, is_fno=True)
+  76:         assert margin == pytest.approx(100 * 750 * 0.15, rel=0.01)
+  77:         assert "fno" in src.lower()
+  78: 
+  79:     def test_check_with_no_broker_soft_allows(self):
+  80:         """When broker can't be reached, sufficient=True with a warning so
+  81:         the order goes through (broker will reject if truly under-funded)."""
+  82:         from app.services.funds_check import check
+  83:         result = check(entry=100, quantity=10, product_type="DELIVERY")
+  84:         # Broker is not authenticated in test env → soft-allow path
+  85:         assert result.sufficient is True
+
+##### grep /models\.portfolio/ in ['app/services/risk_guard.py']
+-- app\services\risk_guard.py:262
+ 259:     Defensive: if the portfolio model is unavailable / table empty, returns 0.
+ 260:     """
+ 261:     try:
+ 262:         from app.models.portfolio import Position    # type: ignore
+ 263:         positions = db.query(Position).filter_by(user_id=user_id, status="OPEN").all()
+ 264:         if not positions or capital <= 0:
+ 265:             return 0.0
+-- app\services\risk_guard.py:279
+ 276: def recent_loss_count(db, user_id: int, lookback_days: int = LOSS_LOOKBACK_DAYS) -> int:
+ 277:     """Count closed-losing trades for the user in the lookback window."""
+ 278:     try:
+ 279:         from app.models.portfolio import Position    # type: ignore
+ 280:         cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+ 281:         rows = (db.query(Position)
+ 282:                   .filter(Position.user_id == user_id,
+
+##### app/models listing
+__init__.py
+audit_log.py
+live_picks.py
+ohlcv_bar.py
+signal.py
+signals_journal.py
+subscription.py
+tick_log.py
+trade.py
+trade_execution.py
+user.py
+user_broker_session.py
+watchlist.py
+
+##### grep /\bNRML\b|[\"']BO[\"']/ in ['app/**/*.py']
+-- app\api\trade.py:54
+  53:     quantity: int = Field(..., gt=0)
+  54:     product_type: str = Field("DELIVERY", pattern="^(DELIVERY|INTRADAY|MARGIN|MIS|CNC|NRML)$")
+  55:     order_type: str = Field("MARKET", pattern="^(MARKET|LIMIT|SL|SL-M)$")
+-- app\services\fno_recommendation.py:210
+ 209:         "broker": "ANGEL_ONE",
+ 210:         "product": "NRML",            # F&O carry-forward; bracket isn't supported for multi-leg
+ 211:         "validity": "DAY",
+-- app\services\funds_check.py:119
+ 118:         return notional * EQUITY_INTRADAY_MARGIN_FRACTION, "fallback_equity_intraday"
+ 119:     # DELIVERY / CNC / NRML / MARGIN — assume full cash required (safest)
+ 120:     return notional * EQUITY_DELIVERY_MARGIN_FRACTION, "fallback_equity_delivery"
+-- app\services\trade_executor.py:279
+ 278:     # truly under-funded — that's never worse than today's behavior.
+ 279:     is_fno = order.product_type in ("MIS", "NRML")    # rough heuristic; F&O uses different products
+ 280:     funds_result = funds_check.check(
+
+##### tests/test_fno_recommendation.py  lines 100-130
+ 100: 
+ 101: class TestBuildHappyPath:
+ 102:     def test_actionable_bull_call_spread(self):
+ 103:         d = _base_symbol_data()
+ 104:         rec = build(d)
+ 105:         assert rec.symbol == "NIFTY"
+ 106:         assert rec.verdict == "BUY"
+ 107:         assert rec.conviction == "MEDIUM"
+ 108:         assert rec.direction == "BULLISH"
+ 109:         assert rec.confidence_pct == 72.0
+ 110:         assert rec.confidence_is_calibrated is True
+ 111:         assert rec.strategy == "BULL_CALL_SPREAD"
+ 112:         assert len(rec.legs) == 2
+ 113:         assert rec.max_profit_inr == 1250
+ 114:         assert rec.suggested_lots == 2
+ 115: 
+ 116:     def test_headline_contains_strategy_for_multi_leg(self):
+ 117:         d = _base_symbol_data()
+ 118:         rec = build(d)
+ 119:         # Multi-leg strategy → headline shows strategy name, not single strike
+ 120:         assert "BULL CALL SPREAD" in rec.headline
+ 121:         assert "(2 legs)" in rec.headline
+ 122: 
+ 123:     def test_execution_payload_built_for_actionable(self):
+ 124:         d = _base_symbol_data()
+ 125:         rec = build(d)
+ 126:         assert rec.execution_payload is not None
+ 127:         assert rec.execution_payload["product"] == "BO"
+ 128:         assert rec.execution_payload["lots"] == 2
+ 129:         assert len(rec.execution_payload["legs"]) == 2
+ 130: 
+
+##### tests/test_strategy_entry.py  lines 245-280
+ 245: 
+ 246:     def test_intraday_requires_3_consecutive_bars(self):
+ 247:         plan = select(
+ 248:             symbol="TEST", spot=110.0, direction="BULLISH",
+ 249:             confidence=70, atr=2.0, iv_pct=20.0,
+ 250:             horizon="INTRADAY", capital=100_000,
+ 251:             gann_support=100.0, gann_resistance=120.0,
+ 252:             recent_candles=[{"open": 108, "close": 110},
+ 253:                              {"open": 109, "close": 111}],     # only 2 bullish
+ 254:             attach_timing=False,
+ 255:         )
+ 256:         cc = plan.candle_confirmation
+ 257:         assert cc["required"] == 3
+ 258:         assert cc["confirmed"] is False
+ 259:         # Should also add a "wait for momentum" note
+ 260:         assert any("consecutive" in n.lower() for n in plan.notes)
+ 261: 
+ 262:     def test_stoploss_anchored_below_support_for_bullish(self):
+ 263:         """SL should sit below Gann support (with buffer), not just entry - 1.5×ATR.
+ 264:         This is the structural-stop fix: ATR-only stops get swept by noise."""
+ 265:         plan = select(
+ 266:             symbol="TEST", spot=110.0, direction="BULLISH",
+ 267:             confidence=70, atr=2.0, iv_pct=18.0,
+ 268:             horizon="SWING", capital=100_000,
+ 269:             gann_support=104.0, gann_resistance=120.0,
+ 270:             recent_candles=[{"open": 108, "close": 110}],
+ 271:             attach_timing=False,
+ 272:         )
+ 273:         # SL should be at-or-below gann_support*0.995 = ~103.48
+ 274:         assert plan.stoploss <= 104.0
+
+##### grep /def select\b|stoploss\s*=/ in ['app/**/*.py']
+-- app\api\signals.py:42
+  42:                     stoploss=res["stoploss"],
+  43:                     targets=res["targets"],
+  44:                     risk_reward=res["risk_reward"],
+-- app\api\symbol.py:351
+ 351:             plan.stoploss = float(stop_loss_block["recommended_sl"])
+ 352:             stop_loss_block["legacy_sl"] = round(legacy_sl, 2)
+ 353:             stop_loss_block["applied"] = True
+-- app\api\symbol.py:774
+ 774:             entry=plan.entry, stoploss=plan.stoploss, target_1=t1,
+ 775:             capital=capital, lot_size=1,
+ 776:             open_positions_risk_pct=0.0,    # filled when /api/portal/* calls (needs user_id)
+-- app\api\trade.py:146
+ 146:         stoploss=req.stoploss,
+ 147:         target_1=req.target_1,
+ 148:         target_2=req.target_2,
+-- app\api\trade.py:198
+ 198:             stoploss=leg.stoploss,
+ 199:             target_1=leg.target_1,
+ 200:             target_2=leg.target_2,
+-- app\api\trade.py:458
+ 458:         stoploss=req.stoploss, target_1=req.target_1,
+ 459:     )
+ 460:     if not result.ok:
+-- app\engines\decision.py:129
+ 129:         stoploss = round(spot - 1.5 * atr_val, 2)
+ 130:         targets = [round(spot + k * atr_val, 2) for k in (1.5, 2.5, 4.0)]
+ 131:     elif signal in ("SELL", "STRONG_SELL"):
+-- app\engines\decision.py:133
+ 133:         stoploss = round(spot + 1.5 * atr_val, 2)
+ 134:         targets = [round(spot - k * atr_val, 2) for k in (1.5, 2.5, 4.0)]
+ 135:     else:
+-- app\engines\decision.py:137
+ 137:         stoploss = round(spot - 1.0 * atr_val, 2)
+ 138:         targets = [round(spot + k * atr_val, 2) for k in (1.0, 2.0)]
+ 139: 
+-- app\engines\horizon_strategy.py:444
+ 444:         entry=entry, stoploss=sl,
+ 445:         target_1=t1, target_2=t2, target_3=t3,
+ 446:         risk_reward_t1=rr1, risk_reward_t3=rr3,
+-- app\engines\recommendation_grade.py:376
+ 376:         stoploss=float(signal_dict.get("stoploss", 0)),
+ 377:         targets=list(signal_dict.get("targets", [])),
+ 378:         capital=capital,
+-- app\engines\strategy.py:252
+ 252: def select(
+ 253:     symbol: str,
+ 254:     spot: float,
+-- app\engines\strategy.py:347
+ 347:         stoploss = round(min(entry - 1.5 * atr, sl_struct) if sl_struct
+ 348:                           else entry - 1.5 * atr, 2)
+ 349:         targets = [round(entry + k * atr, 2) for k in (1.5, 2.5, 4.0)]
+-- app\engines\strategy.py:353
+ 353:         stoploss = round(max(entry + 1.5 * atr, sl_struct) if sl_struct
+ 354:                           else entry + 1.5 * atr, 2)
+ 355:         targets = [round(entry - k * atr, 2) for k in (1.5, 2.5, 4.0)]
+-- app\engines\strategy.py:357
+ 357:         stoploss = round(entry - 2 * atr, 2)
+ 358:         targets = [round(entry + 1.5 * atr, 2), round(entry + 3 * atr, 2)]
+ 359:     elif strategy == "OPT_BEAR_PUT_SPREAD":
+-- app\engines\strategy.py:360
+ 360:         stoploss = round(entry + 2 * atr, 2)
+ 361:         targets = [round(entry - 1.5 * atr, 2), round(entry - 3 * atr, 2)]
+ 362:     elif strategy == "OPT_IRON_CONDOR":
+-- app\engines\strategy.py:363
+ 363:         stoploss = round(spot + 3 * atr, 2)   # outer-wing breach (range strategy → anchored to spot)
+ 364:         targets = [round(spot, 2)]            # max profit if expiry near spot
+ 365:     elif strategy == "OPT_LONG_STRADDLE":
+-- app\engines\strategy.py:366
+ 366:         stoploss = round(spot, 2)
+ 367:         targets = [round(spot + 3 * atr, 2), round(spot - 3 * atr, 2)]
+ 368:     elif strategy == "OPT_SHORT_STRANGLE":
+-- app\engines\strategy.py:369
+ 369:         stoploss = round(spot + 3 * atr, 2)
+ 370:         targets = [round(spot, 2)]
+ 371:     else:
+-- app\engines\strategy.py:372
+ 372:         stoploss = round(spot - 1 * atr, 2)
+ 373:         targets = []
+ 374: 
