@@ -72,7 +72,7 @@ class TestFundsCheck:
     def test_estimate_required_margin_fno(self):
         from app.services.funds_check import estimate_required_margin
         # F&O ~15% margin estimate
-        margin, src = estimate_required_margin(entry=100, quantity=750, is_fno=True)
+        margin, src = estimate_required_margin(entry=100, quantity=750, product_type="NRML", is_fno=True)
         assert margin == pytest.approx(100 * 750 * 0.15, rel=0.01)
         assert "fno" in src.lower()
 

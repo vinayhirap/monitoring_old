@@ -96,7 +96,7 @@ def _atr_candidate(*, entry: float, atr: float, direction: Direction,
     """ATR-based SL. Multiplier depends on volatility regime:
        LOW_VOL → 1.5×ATR, NORMAL → 2.0×ATR, HIGH_VOL → 2.5×ATR.
     """
-    if atr <= 0:
+    if atr <= 0 or entry <= 0:
         return None
     mult = 1.5 if vol_regime == "LOW_VOL" else 2.5 if vol_regime == "HIGH_VOL" else 2.0
     distance = mult * atr
@@ -361,7 +361,7 @@ def compute(*, entry: float, direction: str, atr: float,
             direction=dir_typed, entry=round(entry, 2),
             recommended_sl=round(sl, 2),
             recommended_method="FALLBACK_2PCT",
-            distance_pct=round(fallback_distance / entry * 100, 3),
+            distance_pct=(round(fallback_distance / entry * 100, 3) if entry > 0 else 0.0),
             confluence_count=1, confluence_low=None, confluence_high=None,
             candidates=[],
             reasons=["No method produced a usable SL — applied 2% fallback"],

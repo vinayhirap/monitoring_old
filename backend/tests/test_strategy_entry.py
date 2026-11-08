@@ -264,7 +264,7 @@ class TestSelectIntegration:
         This is the structural-stop fix: ATR-only stops get swept by noise."""
         plan = select(
             symbol="TEST", spot=110.0, direction="BULLISH",
-            confidence=70, atr=2.0, iv_pct=18.0,
+            confidence=70, atr=2.0, iv_pct=16.0,
             horizon="SWING", capital=100_000,
             gann_support=104.0, gann_resistance=120.0,
             recent_candles=[{"open": 108, "close": 110}],

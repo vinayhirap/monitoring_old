@@ -253,38 +253,43 @@ def check(
 # ---------------------------------------------------------------------------
 
 def open_portfolio_risk_pct(db, user_id: int, capital: float) -> float:
-    """Sum risk-at-stop across the user's active portfolio positions.
-    Returns a percent of capital figure.
+    """Sum risk-at-stop across the user's OPEN positions, as a percent of capital.
 
-    Defensive: if the portfolio model is unavailable / table empty, returns 0.
+    Uses app.models.trade_execution.Position (exec_positions). A position with no
+    stop on file is treated as full notional at risk (fail closed).
     """
+    if capital <= 0:
+        return 0.0
     try:
-        from app.models.portfolio import Position    # type: ignore
-        positions = db.query(Position).filter_by(user_id=user_id, status="OPEN").all()
-        if not positions or capital <= 0:
-            return 0.0
+        from app.models.trade_execution import Position
+        positions = (db.query(Position)
+                       .filter(Position.user_id == user_id, Position.status == "OPEN")
+                       .all())
         total_risk = 0.0
         for p in positions:
-            sl_dist = abs((p.entry_price or 0) - (p.stop_loss or 0))
-            total_risk += sl_dist * (p.quantity or 0)
+            entry = p.avg_entry_price or 0.0
+            qty = abs(p.net_quantity or 0)
+            sl = p.current_sl
+            sl_dist = abs(entry - sl) if sl else entry
+            total_risk += sl_dist * qty
         return round(total_risk / capital * 100, 3)
     except Exception as e:
-        logger.debug("open_portfolio_risk_pct unavailable: {}", e)
+        logger.warning("open_portfolio_risk_pct failed - portfolio-risk check SKIPPED: {}", e)
         return 0.0
 
 
 def recent_loss_count(db, user_id: int, lookback_days: int = LOSS_LOOKBACK_DAYS) -> int:
-    """Count closed-losing trades for the user in the lookback window."""
+    """Count closed-losing positions for the user in the lookback window."""
     try:
-        from app.models.portfolio import Position    # type: ignore
+        from app.models.trade_execution import Position
         cutoff = datetime.utcnow() - timedelta(days=lookback_days)
         rows = (db.query(Position)
                   .filter(Position.user_id == user_id,
-                           Position.status == "CLOSED",
-                           Position.closed_at >= cutoff,
-                           Position.realized_pnl < 0)
+                          Position.status == "CLOSED",
+                          Position.closed_at >= cutoff,
+                          Position.realized_pnl < 0)
                   .count())
         return int(rows)
     except Exception as e:
-        logger.debug("recent_loss_count unavailable: {}", e)
+        logger.warning("recent_loss_count failed - loss-streak check SKIPPED: {}", e)
         return 0

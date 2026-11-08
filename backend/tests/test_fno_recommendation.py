@@ -124,7 +124,7 @@ class TestBuildHappyPath:
         d = _base_symbol_data()
         rec = build(d)
         assert rec.execution_payload is not None
-        assert rec.execution_payload["product"] == "BO"
+        assert rec.execution_payload["product"] == "NRML"
         assert rec.execution_payload["lots"] == 2
         assert len(rec.execution_payload["legs"]) == 2
 
