@@ -32,8 +32,8 @@ from app.models.live_picks import LivePicksSnapshot
 import os
 
 
-SCAN_INTERVAL_MINUTES = 5
-FRESHNESS_THRESHOLD_SECONDS = 600     # 10 min — a 5-min interval +slack
+SCAN_INTERVAL_MINUTES = 15
+FRESHNESS_THRESHOLD_SECONDS = 1800    # 30 min = 2x the 15-min scan interval
 
 # ----- Universe selection (env-driven) -----
 # Which symbol pool the scanner sweeps. Tradeoffs:
@@ -48,7 +48,7 @@ FRESHNESS_THRESHOLD_SECONDS = 600     # 10 min — a 5-min interval +slack
 # pipeline runs, keeping scan time bounded.
 #
 # Set SCANNER_UNIVERSE in env to override.
-SCANNER_UNIVERSE   = os.getenv("SCANNER_UNIVERSE", "nifty500").lower()
+SCANNER_UNIVERSE   = os.getenv("SCANNER_UNIVERSE", "fno_top50").lower()
 # Set "1"/"0" to force prefilter on/off, or leave unset for auto.
 SCANNER_PREFILTER  = os.getenv("SCANNER_PREFILTER", "").strip()
 

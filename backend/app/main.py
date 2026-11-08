@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from loguru import logger
+import app.services.json_compat  # noqa: F401  numpy -> JSON
 
 from app.config import settings
 from app.database import init_db
@@ -77,7 +78,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("instrument master warmup failed: {}", e)
 
-    # Daily signals-journal retention purge — keep last 14 days. Runs every 6h.
+    # Daily signals-journal retention purge — keep last 120 days. Runs every 6h.
     try:
         import threading, time as _t
         from app.services.signals_logger import purge_older_than_days
@@ -85,11 +86,11 @@ async def lifespan(app: FastAPI):
             while True:
                 _t.sleep(6 * 3600)        # every 6 hours
                 try:
-                    purge_older_than_days(days=14)
+                    purge_older_than_days(days=120)
                 except Exception as e:
                     logger.debug("retention purge crashed: {}", e)
         threading.Thread(target=_retention_loop, name="journal-retention", daemon=True).start()
-        logger.info("Journal retention thread started (14-day window, purges every 6h)")
+        logger.info("Journal retention thread started (120-day window, purges every 6h)")
     except Exception as e:
         logger.warning("retention setup failed: {}", e)
 

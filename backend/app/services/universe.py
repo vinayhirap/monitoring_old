@@ -49,7 +49,7 @@ SECTORS: dict[str, list[str]] = {
     ],
     "Telecom & Media": [
         "BHARTIARTL", "IDEA", "INDUSTOWER", "ZEEL", "SUNTV", "PVRINOX",
-        "NETWORK18", "TV18BRDCST", "DISHTV",
+        "NETWORK18", "DISHTV",
     ],
     "Consumer Durables / Retail": [
         "TITAN", "ASIANPAINT", "BERGEPAINT", "PIDILITIND", "HAVELLS", "VOLTAS",
@@ -57,14 +57,14 @@ SECTORS: dict[str, list[str]] = {
         "DMART", "JUBLFOOD", "WHIRLPOOL", "BLUESTARCO",
     ],
     "Chemicals / Agro": [
-        "UPL", "PIIND", "SRF", "DEEPAKNTR", "AARTI IND", "ALKYLAMINE",
+        "UPL", "PIIND", "SRF", "DEEPAKNTR", "AARTIIND", "ALKYLAMINE",
         "ATUL", "NAVINFLUOR", "GNFC", "CHAMBLFERT", "COROMANDEL",
     ],
     "Misc": [
         "ADANIENSOL", "ABFRL", "ABCAPITAL", "ABBOTINDIA", "BEL", "BHEL",
-        "CONCOR", "CUMMINSIND", "GMRINFRA", "HAL", "IRCTC", "MFSL",
-        "NAUKRI", "PAGEIND", "PIRAMA", "SBICARD", "SIEMENS", "TATACHEM",
-        "TATACOMM", "VEDL", "VOLTAS", "ZOMATO", "PAYTM", "POLICYBZR",
+        "CONCOR", "CUMMINSIND", "GMRAIRPORT", "HAL", "IRCTC", "MFSL",
+        "NAUKRI", "PAGEIND", "PIRAMALFIN", "SBICARD", "SIEMENS", "TATACHEM",
+        "TATACOMM", "VEDL", "VOLTAS", "ETERNAL", "PAYTM", "POLICYBZR",
     ],
 }
 

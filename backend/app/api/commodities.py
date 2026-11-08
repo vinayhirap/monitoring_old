@@ -68,6 +68,60 @@ def commodity_astro(symbol: str,
 # Per-commodity deep analysis (mirrors /api/symbol/{sym} but for MCX)
 # ---------------------------------------------------------------------------
 
+@router.get("/scan", summary="Scan all MCX commodities and rank")
+def scan(user: Annotated[User, Depends(require_tier("INTERMEDIATE"))],
+                horizon: str = Query("SWING", pattern="^(INTRADAY|SWING|POSITIONAL)$"),
+                capital: float = Query(100_000, gt=0),
+                min_confidence: float = Query(55.0, ge=0, le=100),
+                parallel: int = Query(4, ge=1, le=10)):
+    universe = cu.all_commodities()
+    asof = datetime.now().isoformat()
+    results: list[dict] = []
+    errors: list[str] = []
+
+    with ThreadPoolExecutor(max_workers=parallel) as pool:
+        futures = {pool.submit(_score_one, sym, horizon, capital): sym for sym in universe}
+        for fut in as_completed(futures):
+            r = fut.result()
+            if r is None:
+                continue
+            if "error" in r:
+                errors.append(f"{r['symbol']}: {r['error']}")
+            else:
+                results.append(r)
+
+    buys = [r for r in results if r["signal"] == "BUY" and r["confidence"] >= min_confidence]
+    sells = [r for r in results if r["signal"] == "SELL"]
+    buys.sort(key=lambda x: -x["confidence"])
+    sells.sort(key=lambda x: x["confidence"])
+
+    # Group by category
+    by_category: dict[str, list] = {}
+    for r in results:
+        by_category.setdefault(r["category"], []).append({
+            "symbol": r["symbol"], "display": r["display"],
+            "confidence": r["confidence"], "direction": r["direction"],
+            "ruling_planet": r["ruling_planet"],
+        })
+
+    return {
+        "asof": asof,
+        "universe_size": len(universe),
+        "scanned": len(results),
+        "min_confidence": min_confidence,
+        "horizon": horizon,
+        "top_buy": buys,
+        "top_sell": sells,
+        "by_category": by_category,
+        "errors": errors,
+        "disclaimer": (
+            "MCX commodity scan. Uses Mundane astrology (planetary rulership) "
+            "in place of equity letter-vibration. Verify each signal before "
+            "deploying capital. Not SEBI-registered advice."
+        ),
+    }
+
+
 @router.get("/{symbol}", summary="Per-commodity full analysis (chart, engines, options, gap forecast)")
 def commodity_detail(symbol: str,
                             user: Annotated[User, Depends(require_tier("INTERMEDIATE"))],
@@ -201,57 +255,3 @@ def _score_one(sym: str, horizon: str, capital: float) -> dict | None:
     except Exception as e:
         logger.warning("commodity scan failed for {}: {}", sym, e)
         return {"symbol": sym, "error": str(e)}
-
-
-@router.get("/scan", summary="Scan all MCX commodities and rank")
-def scan(user: Annotated[User, Depends(require_tier("INTERMEDIATE"))],
-                horizon: str = Query("SWING", pattern="^(INTRADAY|SWING|POSITIONAL)$"),
-                capital: float = Query(100_000, gt=0),
-                min_confidence: float = Query(55.0, ge=0, le=100),
-                parallel: int = Query(4, ge=1, le=10)):
-    universe = cu.all_commodities()
-    asof = datetime.now().isoformat()
-    results: list[dict] = []
-    errors: list[str] = []
-
-    with ThreadPoolExecutor(max_workers=parallel) as pool:
-        futures = {pool.submit(_score_one, sym, horizon, capital): sym for sym in universe}
-        for fut in as_completed(futures):
-            r = fut.result()
-            if r is None:
-                continue
-            if "error" in r:
-                errors.append(f"{r['symbol']}: {r['error']}")
-            else:
-                results.append(r)
-
-    buys = [r for r in results if r["signal"] == "BUY" and r["confidence"] >= min_confidence]
-    sells = [r for r in results if r["signal"] == "SELL"]
-    buys.sort(key=lambda x: -x["confidence"])
-    sells.sort(key=lambda x: x["confidence"])
-
-    # Group by category
-    by_category: dict[str, list] = {}
-    for r in results:
-        by_category.setdefault(r["category"], []).append({
-            "symbol": r["symbol"], "display": r["display"],
-            "confidence": r["confidence"], "direction": r["direction"],
-            "ruling_planet": r["ruling_planet"],
-        })
-
-    return {
-        "asof": asof,
-        "universe_size": len(universe),
-        "scanned": len(results),
-        "min_confidence": min_confidence,
-        "horizon": horizon,
-        "top_buy": buys,
-        "top_sell": sells,
-        "by_category": by_category,
-        "errors": errors,
-        "disclaimer": (
-            "MCX commodity scan. Uses Mundane astrology (planetary rulership) "
-            "in place of equity letter-vibration. Verify each signal before "
-            "deploying capital. Not SEBI-registered advice."
-        ),
-    }

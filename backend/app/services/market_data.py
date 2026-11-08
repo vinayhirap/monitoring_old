@@ -150,7 +150,15 @@ def get_ohlcv(symbol: str, exchange: str = "NSE", interval: str = "ONE_DAY",
     #   • Auth errors — won't fix themselves.
     #   • "No data" empty responses — handled separately below.
     to_dt = datetime.now()
-    from_dt = to_dt - timedelta(days=periods + 30)
+    # `periods` counts trading BARS. Daily bars are ~252 per 365 calendar
+    # days, so the old `periods + 30` calendar-day window returned only
+    # ~2/3 of the bars asked for (250 requested -> 169 returned).
+    # Angel One caps ONE_DAY history at 2000 days per request.
+    if interval == "ONE_DAY":
+        _days = min(2000, int(periods * 1.5) + 30)
+    else:
+        _days = periods + 30
+    from_dt = to_dt - timedelta(days=_days)
     data = None
     last_err: Exception | None = None
     TRANSIENT_MARKERS = (
