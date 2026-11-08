@@ -1,10 +1,10 @@
-"""Angel One instrument master — symbol → token resolver.
+﻿"""Angel One instrument master — symbol → token resolver.
 
 Angel One's quote / candle / order APIs require an integer `symbolToken`,
 not the human-readable symbol. The full instrument master (~80,000 rows
 across NSE/BSE/NFO/MCX) is published as a JSON file at:
 
-    https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPI_ScripMaster.json
+    https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json
 
 We download it lazily (first request), cache to disk (~/.cache/marketlens/),
 and refresh once per day. All token lookups read from an in-memory index.
@@ -26,8 +26,8 @@ from loguru import logger
 # All return JSON when reached with a browser User-Agent (default httpx UA
 # is rejected by their Cloudflare layer).
 SCRIP_MASTER_URLS = [
-    "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPI_ScripMaster.json",
-    "https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPI_ScripMaster.json",
+    "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json",
+    "https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json",
 ]
 SCRIP_MASTER_URL = SCRIP_MASTER_URLS[0]   # backward-compat alias
 
@@ -568,3 +568,4 @@ def all_instruments() -> list[dict]:
             "token":    str(row.get("token", "")),
         })
     return out
+
