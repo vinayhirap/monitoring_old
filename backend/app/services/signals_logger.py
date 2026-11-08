@@ -55,18 +55,38 @@ def log_signal(signal: dict, horizon: str = "SWING",
         return None
 
 
-def purge_older_than_days(days: int = 14) -> dict:
-    """Delete journal rows older than `days`. Default 14-day retention.
+# The outcome tracker only scores a signal once its 20-day window has matured
+# (>= 25 days after emission) and marks it STALE after 60 days without data.
+# Retention MUST outlast that, or signals are deleted before they are ever
+# scored and the learning loop (engine attribution, engine weights, confidence
+# calibration) never receives data. PENDING rows are therefore kept longer
+# than the tracker's maturity + stale window.
+PENDING_RETENTION_DAYS = 75
 
-    Returns: {deleted, remaining, oldest_remaining}.
-    Run from a cron daily or call from /api/journal/purge.
+
+def purge_older_than_days(days: int = 120) -> dict:
+    """Delete old journal rows without starving the outcome tracker.
+
+    * Scored rows (EVALUATED / STALE) older than `days` are deleted
+      (default 120, enough for the 90-day attribution lookback).
+    * PENDING rows are kept for max(days, PENDING_RETENTION_DAYS) so they
+      survive until the tracker has had a chance to score them.
+
+    Returns: {deleted, remaining, oldest_remaining, retention_days}.
     """
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    now = datetime.utcnow()
+    cutoff = now - timedelta(days=days)
+    pending_cutoff = now - timedelta(days=max(days, PENDING_RETENTION_DAYS))
     try:
         with SessionLocal() as sess:
             deleted = (sess.query(SignalJournalEntry)
-                        .filter(SignalJournalEntry.emitted_at < cutoff)
+                        .filter(SignalJournalEntry.emitted_at < cutoff,
+                                SignalJournalEntry.outcome_status != "PENDING")
                         .delete(synchronize_session=False))
+            deleted += (sess.query(SignalJournalEntry)
+                         .filter(SignalJournalEntry.emitted_at < pending_cutoff,
+                                 SignalJournalEntry.outcome_status == "PENDING")
+                         .delete(synchronize_session=False))
             remaining = sess.query(SignalJournalEntry).count()
             oldest_row = (sess.query(SignalJournalEntry)
                            .order_by(SignalJournalEntry.emitted_at.asc())
