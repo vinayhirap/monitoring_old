@@ -260,7 +260,7 @@ def execute(db: Session, intent: OrderIntent) -> ExecutionResult:
 
     if not passed:
         order.status = ORDER_STATUS_FAILED
-        order.notes = f"Risk-guard blocked: {rg_dict.get('reasons', ['unknown'])[0]}"
+        order.notes = f"Risk-guard blocked: {(rg_dict.get('reasons') or ['unknown'])[0]}"
         db.commit()
         _audit(intent.user_id, "trade.rejected_pre",
                 f"Order rejected by risk-guard for {intent.symbol}", rg_dict)

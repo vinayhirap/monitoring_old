@@ -12,12 +12,12 @@ INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"]
 SECTORS: dict[str, list[str]] = {
     "Banking & Financial": [
         "HDFCBANK", "ICICIBANK", "AXISBANK", "SBIN", "KOTAKBANK", "INDUSINDBK",
-        "BAJFINANCE", "BAJAJFINSV", "HDFCAMC", "SBILIFE", "HDFCLIFE", "ICICIPRULI",
+        "BAJFINANCE", "BAJAJFINSV", "HDFCAMC", "SBILIFE", "HDFCLIFE",
         "ICICIGI", "CHOLAFIN", "MUTHOOTFIN", "PFC", "RECLTD", "LICHSGFIN",
         "M&MFIN", "BANDHANBNK", "AUBANK", "FEDERALBNK", "IDFCFIRSTB", "IEX",
     ],
     "IT": [
-        "TCS", "INFY", "WIPRO", "HCLTECH", "TECHM", "LTIM", "MPHASIS",
+        "TCS", "INFY", "WIPRO", "HCLTECH", "TECHM", "LTM", "MPHASIS",
         "PERSISTENT", "COFORGE", "LTTS", "OFSS", "TATAELXSI",
     ],
     "Oil & Gas / Energy": [
@@ -25,7 +25,7 @@ SECTORS: dict[str, list[str]] = {
         "OIL", "ATGL", "ADANIENT", "ADANIPORTS", "POWERGRID", "NTPC", "TATAPOWER",
     ],
     "Auto": [
-        "MARUTI", "TATAMOTORS", "M&M", "EICHERMOT", "BAJAJ-AUTO", "HEROMOTOCO",
+        "MARUTI", "TMPV", "TMCV", "M&M", "EICHERMOT", "BAJAJ-AUTO", "HEROMOTOCO",
         "TVSMOTOR", "ASHOKLEY", "BOSCHLTD", "MOTHERSON", "BHARATFORG", "ESCORTS",
         "MRF", "BALKRISIND", "EXIDEIND",
     ],

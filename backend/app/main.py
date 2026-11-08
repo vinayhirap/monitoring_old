@@ -51,6 +51,9 @@ from app.api import (
 from app.ws import server as ws_server
 
 
+from app.services.log_redact import install_redaction  # noqa: E402
+install_redaction()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting MarketLens backend (env={}, paper={}, live_only={})",
